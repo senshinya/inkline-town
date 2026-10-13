@@ -45,8 +45,8 @@ export function makeTree(
     trunk = Math.round(6 * s)
   const d = new Drawing(
     id,
-    `${type === "broadleaf" ? "Broadleaf" : type === "poplar" ? "Poplar" : "Fir"} · ${grown >= 1 ? "grown" : grown >= 0.5 ? "young" : "sapling"}`,
-    "Seeded tree shape, original leaf colours and growth stages, built as a complete volume."
+    `${type === "broadleaf" ? "阔叶树" : type === "poplar" ? "杨树" : "冷杉"} · ${grown >= 1 ? "成树" : grown >= 0.5 ? "幼树" : "树苗"}`,
+    "根据种子生成树形，保留原始叶色与生长阶段，构成完整立体模型。"
   )
   d.asset.category = "land"
   d.asset.reference = { type: "tree", x, y, grown }
@@ -155,7 +155,7 @@ export function rockOutcrop(d: Drawing, u: number, v: number, radius: number, he
 }
 
 export function makeRock(ore: boolean, full: boolean, variant = 0) {
-  const d=new Drawing(`${ore?"ore":"stone"}-${full?"full":"quarried"}`,`${ore?"Ore":"Stone"} · ${full?"full":"quarried"}`,"A clustered deposit with clean shaded facets and seeded silhouettes. Stone and ore use distinct mineral palettes.")
+  const d=new Drawing(`${ore?"ore":"stone"}-${full?"full":"quarried"}`,`${ore?"矿石":"石料"} · ${full?"完整":"已开采"}`,"成簇矿床，切面清晰，轮廓随种子变化；石料与矿石使用不同配色。")
   d.asset.category="land";d.asset.reference={type:"rock",x:ore?5:0,y:ore?3:0,ore,amount:full?40:10};d.asset.footprint=1
   rockOutcrop(d,-2.9*U,-2.2*U,2.8*U,full?10:4,ore,variant+2)
   rockOutcrop(d,0.3*U,-0.1*U,(full?4.4:4)*U,full?12+(variant%3)*1.5:6,ore,variant)
@@ -167,8 +167,8 @@ export function makeRock(ore: boolean, full: boolean, variant = 0) {
 export function makeField(stage: 0 | 1 | 2 | 3) {
   const d = new Drawing(
     `field-${stage}`,
-    `Field · ${["sown", "sprouting", "growing", "ripe"][stage]}`,
-    "The original soil, three furrows and four crop stages."
+    `农田 · ${["播种", "发芽", "生长", "成熟"][stage]}`,
+    "原始土壤、三条田垄与四个作物生长阶段。"
   )
   d.asset.category = "land"
   d.asset.reference = { type: "field", grown: stage / 3 }
@@ -201,7 +201,7 @@ export function makeField(stage: 0 | 1 | 2 | 3) {
 }
 
 export function makeRoadPatch() {
-  const d = new Drawing("roads", "Road junction", "Twelve-unit paving, kerbs, worn stones and dashed markings, with clean junctions.")
+  const d = new Drawing("roads", "道路交叉口", "十二单位宽的路面，配有路缘、磨损石块与虚线标记，路口连接整齐。")
   d.asset.category = "land"
   d.asset.reference = { type: "roads" }
   d.asset.footprint = 3
@@ -235,7 +235,7 @@ export function makeRoadPatch() {
   return d.asset
 }
 export function makeWater() {
-  const d = new Drawing("water", "Water & shore", "Flat pale water, ink waves, shore edges and white glints.")
+  const d = new Drawing("water", "水域与岸线", "浅色平静水面、墨线波纹、岸线与白色反光。")
   d.asset.category = "land"
   d.asset.reference = { type: "water" }
   d.asset.footprint = 3

@@ -27,7 +27,7 @@ export function institutionDoor(d: Drawing, side: Side, a: number, kind: "chapel
 
 export function makeQuarry(options: BuildingOptions = {}) {
   const fit = options.fit ?? 1, p = 15*U, H = 32
-  const d = new Drawing("quarry", "Quarry", "A two-cell stonecutting yard with a stepped rock face, timber derrick, dressed blocks and a small workshop.")
+  const d = new Drawing("quarry", "采石场", "两格宽的采石场，设有阶梯岩壁、木制吊架、加工石块与小工坊。")
   d.asset.category="buildings";d.asset.reference={type:"building",kind:"quarry"};d.asset.footprint=kinds.quarry.size
   if(options.plate!==false)d.plate(2)
   d.box(-9*U,-6*U,4*U,7*U,0,H)
@@ -53,13 +53,13 @@ export function makeQuarry(options: BuildingOptions = {}) {
 }
 
 export const townBuildingNotes: Partial<Record<KindId, string>> = {
-  granary: "Raised grain store with timber braces, a sack hoist, ventilation shutters and grain bins.",
-  smokehouse: "Soot-stained flue, drying fish rack, split firewood and a curing barrel.",
-  firewatch: "A timber lookout and alarm bell above the red roof; ladder, buckets and a water butt below.",
-  healer: "An apothecary with a mortar sign, herb beds, medicine jars and a waiting bench.",
-  hospital: "Pale green ward windows, a roof lantern, medical emblems and a waiting bench.",
-  watchhouse: "Blue shield, barred windows, a lantern and a street noticeboard.",
-  builder: "Open timber racks, trestle workbench, mallet, ladder and dressed stone."
+  granary: "架高粮仓，配有木支架、粮袋吊机、通风百叶与储粮箱。",
+  smokehouse: "熏黑的烟道、晾鱼架、劈好的柴火与腌制桶。",
+  firewatch: "红色屋顶上设有木制瞭望台与警钟，下方摆放梯子、水桶与储水桶。",
+  healer: "医馆配有药钵招牌、药草圃、药罐与候诊长椅。",
+  hospital: "浅绿色病房窗户、屋顶采光亭、医疗标志与候诊长椅。",
+  watchhouse: "蓝色盾牌标志、带护栏的窗户、灯笼与街道公告栏。",
+  builder: "开放式木材架、支架工作台、木槌、梯子与加工石料。"
 }
 
 export function finishTownBuilding(d: Drawing, id: KindId, a: number, p: number, H: number) {

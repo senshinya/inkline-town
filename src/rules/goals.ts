@@ -22,10 +22,10 @@ export const goalsOf = (
   const goal = rules.sizes[charter.size].goal
   const residents = s.settlers + s.citizens
   return [
-    { id: "residents", text: `${goal.residents} residents`, value: `${residents}`, met: residents >= goal.residents },
-    { id: "citizens", text: `${Math.round(rules.fate.citizens * 100)}% of them citizens`, value: `${residents > 0 ? Math.round((s.citizens / residents) * 100) : 0}%`, met: residents > 0 && s.citizens >= residents * rules.fate.citizens },
-    { id: "approval", text: `approval ${rules.fate.approval} or more`, value: `${s.approval}`, met: s.approval >= rules.fate.approval },
-    { id: "coins", text: `${goal.coins} coins, not losing any`, value: `${s.coins}`, met: s.coins >= goal.coins && s.net >= 0 }
+    { id: "residents", text: `${goal.residents} 位居民`, value: `${residents}`, met: residents >= goal.residents },
+    { id: "citizens", text: `市民占比 ${Math.round(rules.fate.citizens * 100)}%`, value: `${residents > 0 ? Math.round((s.citizens / residents) * 100) : 0}%`, met: residents > 0 && s.citizens >= residents * rules.fate.citizens },
+    { id: "approval", text: `支持度至少 ${rules.fate.approval}`, value: `${s.approval}`, met: s.approval >= rules.fate.approval },
+    { id: "coins", text: `${goal.coins} 金币，且收支不亏损`, value: `${s.coins}`, met: s.coins >= goal.coins && s.net >= 0 }
   ] as const
 }
 

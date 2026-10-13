@@ -173,12 +173,12 @@ export const Hazards = Game.System(
         commands.insert(row.entity.id, Game.Command.entry(Burning, { left: risk.fire.burns, fire: id }))
         ignited.set(row.entity.id, id)
         r.fire = 0
-        news(`Fire on ${where(tile)}!`, tile)
+        news(`${where(tile)}发生火灾！`, tile)
       }
       if (h && r.health >= RISK_MAX && !data.sick.present) {
         commands.insert(row.entity.id, Game.Command.entry(Sick, { left: risk.health.lasts }))
         r.health = 0
-        if (sickNow === 0) news(`Sickness on ${where(tile)}: a physician can cure it.`, tile)
+        if (sickNow === 0) news(`${where(tile)}出现疾病：医师可以治疗。`, tile)
       }
       if (h && r.order >= RISK_MAX) {
         if (r.thefts === 0) {
@@ -187,7 +187,7 @@ export const Hazards = Game.System(
           const take = Math.min(risk.order.most, Math.max(0, coins), risk.order.coins + Math.floor(Math.max(0, coins) * risk.order.share))
           if (take > 0) {
             resources.treasury.set({ coins: coins - take })
-            news(`Thieves on ${where(tile)} made off with ${take} coins.`, tile)
+            news(`${where(tile)}的盗贼偷走了 ${take} 金币。`, tile)
           } else {
             const stores = queries.stores.each()
             const held = (g: GoodId) => stores.reduce((n, s) => n + s.data.inventory.get().stock[g], 0)
@@ -200,12 +200,12 @@ export const Hazards = Game.System(
               s.inventory.set({ ...inv, stock: { ...inv.stock, [good]: inv.stock[good] - n } })
               owed -= n
             }
-            if (held(good) > 0) news(`Thieves on ${where(tile)} made off with ${goods[good].title}.`, tile)
+            if (held(good) > 0) news(`${where(tile)}的盗贼偷走了${goods[good].title}。`, tile)
           }
           r.thefts += 1
           r.order = risk.order.after
         } else {
-          news(`A home on ${where(tile)} stood empty after its thefts, and is left derelict.`, tile)
+          news(`${where(tile)}的一栋住宅多次遭窃，居民离开后房屋荒废。`, tile)
           ruin(row, "derelict")
           lost.add(row.entity.id)
           continue
@@ -302,8 +302,8 @@ export const Hazards = Game.System(
     for (const f of ignited.values()) stillBurning.add(f)
     const over = fires.fires.filter((f) => !stillBurning.has(f.id))
     for (const f of over) {
-      const took = [f.homes > 0 ? counted(f.homes, "home") : "", f.buildings > 0 ? counted(f.buildings, "building") : ""].filter((s) => s !== "")
-      news(`Fire on ${where(f)}: ${took.length > 0 ? `${took.join(" and ")} lost` : "put out"}.`, { x: f.x, y: f.y })
+      const took = [f.homes > 0 ? counted(f.homes, "栋住宅") : "", f.buildings > 0 ? counted(f.buildings, "栋建筑") : ""].filter((s) => s !== "")
+      news(`${where(f)}的火灾：${took.length > 0 ? `${took.join("和")}被烧毁` : "已扑灭"}。`, { x: f.x, y: f.y })
     }
     resources.fires.set({ fires: fires.fires.filter((f) => stillBurning.has(f.id)), next: fires.next })
     resources.rng.set(random.state)

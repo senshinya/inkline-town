@@ -130,8 +130,8 @@ export class MapInput {
     )
     this.controls = document.createElement("nav")
     this.controls.className = "camera-controls"
-    this.controls.setAttribute("aria-label", "Map camera")
-    this.controls.innerHTML = `<button data-mode="pan" aria-pressed="true" title="Drag to pan; the road, pave, home, and park ground tools drag to build">Pan</button><button data-mode="rotate" aria-pressed="false" title="Drag to rotate instead of placing. Right-drag also rotates.">Rotate</button><button data-action="left" aria-label="Rotate map left" title="Rotate left (Q)">↶</button><button data-action="right" aria-label="Rotate map right" title="Rotate right (E)">↷</button><button data-action="out" aria-label="Zoom out">−</button><output aria-label="Camera zoom"></output><button data-action="in" aria-label="Zoom in">+</button><button data-action="reset" aria-label="Reset camera" title="Original angle and centre (Home)">⌂</button>`
+    this.controls.setAttribute("aria-label", "地图镜头")
+    this.controls.innerHTML = `<button data-mode="pan" aria-pressed="true" title="拖动平移；道路、铺石、住宅和公园地面工具通过拖动建造">平移</button><button data-mode="rotate" aria-pressed="false" title="拖动旋转地图；右键拖动也可旋转">旋转</button><button data-action="left" aria-label="向左旋转地图" title="向左旋转（Q）">↶</button><button data-action="right" aria-label="向右旋转地图" title="向右旋转（E）">↷</button><button data-action="out" aria-label="缩小">−</button><output aria-label="镜头缩放"></output><button data-action="in" aria-label="放大">+</button><button data-action="reset" aria-label="重置镜头" title="恢复初始角度和中心（Home）">⌂</button>`
     this.controls.querySelectorAll<HTMLButtonElement>("button").forEach(
       (button) =>
         (button.onclick = () => {

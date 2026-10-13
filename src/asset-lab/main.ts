@@ -29,16 +29,16 @@ import "./style.css"
 
 const root = document.querySelector<HTMLDivElement>("#lab")!
 root.innerHTML = `
-  <header><a href="/model-review.html">Model review ↗</a><span>COMPLETE ASSET CATALOGUE</span><a href="/effects-lab.html">Animated house effects ↗</a></header>
-  <div class="intro"><div><h1>The same ink.<br>A different angle.</h1><p>Original game drawings and complete 3D assets, side by side.</p></div><span class="tag">Procedural · Orthographic · Rotatable</span></div>
-  <div class="filters"><label>Collection <select id="category"></select></label><label>Find <input id="search" type="search" placeholder="Name or material"></label><a href="/map-lab.html">See everything on the map ↗</a></div><nav class="assets" aria-label="Choose an asset"></nav>
-  <section class="comparison" aria-label="Compare the original drawing with the 3D model">
-    <div class="view"><div class="view-label"><span>01 / CURRENT GAME</span><span>Fixed isometric drawing</span></div><canvas id="reference" aria-label="Original 2D asset"></canvas><span class="view-foot">Original art.ts drawing</span></div>
-    <div class="view"><div class="view-label"><span>02 / 3D STUDY</span><span id="angle-label">Original angle</span></div><div id="viewer" role="img" aria-label="Rotatable 3D asset. Drag horizontally to rotate."></div><span class="view-foot">Drag to rotate · wheel to zoom</span></div>
+  <header><a href="/model-review.html">模型预览 ↗</a><span>完整模型图鉴</span><a href="/effects-lab.html">住宅动态特效 ↗</a></header>
+  <div class="intro"><div><h1>熟悉的墨线。<br>不同的角度。</h1><p>对照查看原始绘图与完整 3D 模型。</p></div><span class="tag">程序生成 · 正交投影 · 可旋转</span></div>
+  <div class="filters"><label>合集 <select id="category"></select></label><label>查找 <input id="search" type="search" placeholder="名称或材质"></label><a href="/map-lab.html">在地图中查看全部模型 ↗</a></div><nav class="assets" aria-label="选择模型"></nav>
+  <section class="comparison" aria-label="对比原始绘图与 3D 模型">
+    <div class="view"><div class="view-label"><span>01 / 原始绘图</span><span>固定等距视角绘图</span></div><canvas id="reference" aria-label="原始 2D 绘图"></canvas><span class="view-foot">原始 art.ts 绘图</span></div>
+    <div class="view"><div class="view-label"><span>02 / 3D 模型</span><span id="angle-label">初始角度</span></div><div id="viewer" role="img" aria-label="可旋转的 3D 模型，水平拖动进行旋转。"></div><span class="view-foot">拖动旋转 · 滚轮缩放</span></div>
   </section>
-  <section class="controls" aria-label="Camera controls"><button id="reset">Match original view</button><label>Rotation <input id="rotation" type="range" min="-180" max="180" value="0" step="1"><output id="rotation-value">0°</output></label><label>Elevation <input id="elevation" type="range" min="10" max="65" value="30" step="1"><output id="elevation-value">30°</output></label><button id="rear">See the back</button></section>
-  <section class="caption"><div><h2 id="asset-title"></h2><p id="asset-note"></p></div><div class="downloads"><button id="download-glb">Download GLB</button><button id="download-source">Download geometry</button><button id="download-png">Save comparison</button></div></section>
-  <footer><span>Same palette, dimensions and two ink weights. New faces complete the volume.</span><span>These models are used in the live 3D game.</span></footer>
+  <section class="controls" aria-label="镜头控制"><button id="reset">恢复原始视角</button><label>旋转 <input id="rotation" type="range" min="-180" max="180" value="0" step="1"><output id="rotation-value">0°</output></label><label>仰角 <input id="elevation" type="range" min="10" max="65" value="30" step="1"><output id="elevation-value">30°</output></label><button id="rear">查看背面</button></section>
+  <section class="caption"><div><h2 id="asset-title"></h2><p id="asset-note"></p></div><div class="downloads"><button id="download-glb">下载 GLB</button><button id="download-source">下载几何数据</button><button id="download-png">保存对比图</button></div></section>
+  <footer><span>沿用原始配色、尺寸和两种线宽，补齐各面构成完整体积。</span><span>这些模型用于实际的 3D 游戏。</span></footer>
 `
 const viewer = document.querySelector<HTMLDivElement>("#viewer")!
 const reference = document.querySelector<HTMLCanvasElement>("#reference")!
@@ -272,7 +272,7 @@ function render() {
   root.querySelector("#rotation-value")!.textContent = `${Math.round(yaw)}°`
   root.querySelector("#elevation-value")!.textContent = `${Math.round(pitch)}°`
   root.querySelector("#angle-label")!.textContent =
-    yaw === 0 && pitch === 30 ? "Original angle" : `${Math.round(yaw)}° rotation · ${Math.round(pitch)}° elevation`
+    yaw === 0 && pitch === 30 ? "初始角度" : `旋转 ${Math.round(yaw)}° · 仰角 ${Math.round(pitch)}°`
   drawCount++
 }
 function select(id: string) {
@@ -365,7 +365,7 @@ root.querySelector<HTMLButtonElement>("#download-png")!.onclick = () => {
   ctx.drawImage(renderer.domElement, w, 60, w, h)
   ctx.fillStyle = "#3d4943"
   ctx.font = "24px monospace"
-  ctx.fillText(`${selected.title} / original`, 24, 38)
+  ctx.fillText(`${selected.title} / 原始绘图`, 24, 38)
   ctx.fillText(`3D / ${Math.round(yaw)}°`, w + 24, 38)
   canvas.toBlob((blob) => {
     if (blob) download(blob, `inkline-${selected.id}-comparison.png`)

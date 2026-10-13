@@ -1,5 +1,5 @@
 html, body { margin: 0; height: 100%; overflow: hidden; background: #f0f2ec; touch-action: none; }
-body { font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace; color: #3d4943; -webkit-user-select: none; user-select: none; }
+body { font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", monospace; color: #3d4943; -webkit-user-select: none; user-select: none; }
 #app { position: fixed; inset: 0; }
 #app canvas { display: block; }
 #app .world-canvas { width:100%; height:100%; touch-action:none; outline:none; }

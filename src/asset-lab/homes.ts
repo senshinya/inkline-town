@@ -12,10 +12,10 @@ export function house(
   const fit = options.fit ?? 1
   const d = new Drawing(
     id,
-    tier === 1 ? "Settler cottage" : tier === 2 ? "Citizen home" : "Townhouse",
+    tier === 1 ? "移民小屋" : tier === 2 ? "市民住宅" : "市民宅邸",
     tier === 3
-      ? "A modest three-storey townhouse with regular windows, a simple timber door and the town's familiar gabled roof."
-      : "Original roof palette, footprint, chimney, windows and awnings. Rear walls completed for rotation."
+      ? "朴素的三层市民宅邸，设有整齐窗户、木门与小镇常见的双坡屋顶。"
+      : "沿用原始屋顶配色、占地、烟囱、窗户与遮棚，补齐背面墙体以供旋转查看。"
   )
   const variant = homeVariant(variantN)
   const a = (home.half + (tier >= 2 ? 1 : 0)) * U,

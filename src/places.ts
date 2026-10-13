@@ -7,12 +7,12 @@ import type { KindId } from "./content.ts"
 import { ringOf } from "./appeal.ts"
 
 const streetOf: Readonly<Record<KindId, string>> = {
-  townhall: "Hall", warehouse: "Warehouse", granary: "Granary", lumberjack: "Timber", forester: "Forest", quarry: "Quarry",
-  mine: "Mine", fishery: "Fisher", smokehouse: "Smokehouse", sawmill: "Sawmill", smithy: "Smithy", farm: "Farm", mill: "Mill",
-  bakery: "Baker", sheep: "Shepherd", weaver: "Weaver", market: "Market", chapel: "Chapel", firewatch: "Watch", healer: "Healer",
-  hospital: "Hospital", watchhouse: "Constable", builder: "Builder"
+  townhall: "市政", warehouse: "仓库", granary: "粮仓", lumberjack: "木材", forester: "森林", quarry: "采石",
+  mine: "矿山", fishery: "渔人", smokehouse: "熏鱼", sawmill: "锯木", smithy: "铁匠", farm: "农场", mill: "磨坊",
+  bakery: "面包", sheep: "牧羊", weaver: "织布", market: "集市", chapel: "教堂", firewatch: "消防", healer: "医馆",
+  hospital: "医院", watchhouse: "警员", builder: "工匠"
 }
-const suffixes = ["Lane", "Street", "Row", "Way", "Close", "Walk"] as const
+const suffixes = ["巷", "街", "里", "路", "坊", "步道"] as const
 
 export interface Landmark {
   readonly kind: KindId
@@ -32,11 +32,10 @@ export const placeName = (landmarks: ReadonlyArray<Landmark>, cell: { readonly x
       distance = d
     }
   }
-  if (!best) return "the edge of town"
+  if (!best) return "城镇边缘"
   const suffix = suffixes[(Math.imul(best.x * 73 + best.y * 31 + 7, 2654435761) >>> 0) % suffixes.length]!
-  return `${streetOf[best.kind]} ${best.kind === "townhall" ? "Square" : suffix}`
+  return `${streetOf[best.kind]}${best.kind === "townhall" ? "广场" : suffix}`
 }
 
-/** "one", "two", … for small counts in the news. */
-export const counted = (n: number, one: string, many = `${one}s`) =>
-  `${n <= 10 ? ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"][n] : n} ${n === 1 ? one : many}`
+/** 中文计数无需区分单复数。 */
+export const counted = (n: number, one: string): string => `${n}${one}`

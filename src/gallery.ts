@@ -8,7 +8,7 @@
 import { Application, Container, Graphics } from "pixi.js"
 
 import { carrierDress, cartLook, drawBuilding, drawField, drawHouse, drawRoads, drawRock, drawTree, drawWalker, drawWater, homeVariant, plate, plateHalf, residentDress, serviceDress } from "./art.ts"
-import { categoryColor, goodIds, kindIds, kinds } from "./content.ts"
+import { categoryColor, goodIds, goods, kindIds, kinds } from "./content.ts"
 import { key } from "./grid.ts"
 import { icon, iconNames } from "./icons.ts"
 import { toScreen } from "./iso.ts"
@@ -111,13 +111,23 @@ put(road, 700, 680)
 const drawer = document.createElement("details")
 drawer.open = params.get("icons") !== "0"
 drawer.style.cssText = "position:fixed;left:0;right:0;bottom:0;max-height:40vh;overflow:auto;background:#f7f8f4;border-top:1px solid #c9cec4;font:11px ui-monospace,monospace;color:#3d4943"
-drawer.innerHTML = `<summary style="padding:8px 12px;cursor:pointer">icons</summary>`
+drawer.innerHTML = `<summary style="padding:8px 12px;cursor:pointer">图标</summary>`
 const strip = document.createElement("div")
 strip.style.cssText = "display:flex;flex-wrap:wrap;gap:10px;padding:0 12px 12px"
+const iconTitles: Readonly<Record<string, string>> = {
+  coins: "金币", settlers: "移民", citizens: "市民", people: "人口", jobs: "岗位", approval: "支持度",
+  clock: "时钟", winter: "冬季", summer: "夏季", crown: "王室", warning: "警告", goal: "目标",
+  faith: "信仰", food: "食物", trade: "贸易", treasury: "财政", taxes: "税收", chronicle: "大事记",
+  select: "选择", road: "道路", homes: "住宅", build: "建造", bulldoze: "拆除", town: "城镇",
+  pause: "暂停", play: "继续", save: "保存", load: "读取", newTown: "新城镇", close: "关闭", info: "说明",
+  upkeep: "维护费", burghers: "富裕市民", decor: "公园", pave: "铺石", fire: "火灾", health: "健康",
+  order: "治安", repair: "修缮", appeal: "宜居度", condition: "建筑状况", view: "地图视图", workers: "劳动力"
+}
 for (const name of iconNames) {
   const cell = document.createElement("div")
   cell.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:4px;width:64px"
-  cell.innerHTML = `${icon(name, 32)}<span>${name}</span>`
+  cell.title = name
+  cell.innerHTML = `${icon(name, 32)}<span>${goods[name as keyof typeof goods]?.title ?? iconTitles[name] ?? name}</span>`
   strip.append(cell)
 }
 drawer.append(strip)
@@ -183,14 +193,14 @@ if (params.has("sheet")) {
     if (label) cell.insertAdjacentHTML("beforeend", `<figcaption style="font-size:11px;color:#6c766f">${label}</figcaption>`)
     items.append(cell)
   }
-  const buildings = row("buildings")
+  const buildings = row("建筑")
   for (const id of kindIds) {
     const g = new Graphics()
     plate(g, plateHalf(kinds[id].size))
     drawBuilding(g, kinds[id], 1, 0.5, 1.2, { right: true, left: true })
     await add(buildings, g, kinds[id].title.toLowerCase(), 1.6)
   }
-  const homes = row("homes: settlers and citizens")
+  const homes = row("住宅：移民与市民")
   for (const tier of [1, 2] as const) {
     for (let i = 0; i < 4; i++) {
       const g = new Graphics()
@@ -199,7 +209,7 @@ if (params.has("sheet")) {
       await add(homes, g, "", 1.8)
     }
   }
-  const landRow = row("the land: trees, rocks and ore, fields")
+  const landRow = row("地形：树木、岩石、矿石与农田")
   for (let i = 0; i < 14; i++) {
     const g = new Graphics()
     drawTree(g, i * 3, i * 7, 1)
@@ -215,26 +225,26 @@ if (params.has("sheet")) {
     drawField(g, i / 3)
     await add(landRow, g, "", 1.4)
   }
-  const carts = row("carriers and their loads")
+  const carts = row("运输员与货物")
   for (const [i, good] of goodIds.entries()) {
     const g = new Graphics()
     drawWalker(g, carrierDress(i / 11), { kind: "cart", good, count: 4 }, cartLook((i * 0.37) % 1), i % 2 === 0 ? { x: 1, y: 0 } : { x: 0, y: 1 }, i % 2)
-    await add(carts, g, good, 2.6)
+    await add(carts, g, goods[good].title, 2.6)
   }
-  const people = row("market and chapel walkers, and residents out walking")
+  const people = row("配送员、传教士与散步居民")
   const market = new Graphics()
   drawWalker(market, serviceDress(categoryColor.services, 0.3, false), { kind: "basket", goods: ["fish", "bread", "cloth"] }, null, { x: 1, y: 0 }, 0)
-  await add(people, market, "market", 3)
+  await add(people, market, "市场配送员", 3)
   const chapel = new Graphics()
   drawWalker(chapel, serviceDress(categoryColor.services, 0.6, true), { kind: "bell" }, null, { x: 0, y: 1 }, 1)
-  await add(people, chapel, "chapel", 3)
+  await add(people, chapel, "传教士", 3)
   for (let i = 0; i < 12; i++) {
     const g = new Graphics()
     const tier = i < 6 ? 1 : 2
     drawWalker(g, residentDress(homeVariant((i % 4) / 4 + 0.03).cloth, tier, (i * 0.37) % 1), { kind: "none" }, null, i % 2 === 0 ? { x: 1, y: 0 } : { x: 0, y: 1 }, i % 2)
-    await add(people, g, i === 0 ? "settlers" : i === 6 ? "citizens" : "", 3)
+    await add(people, g, i === 0 ? "移民" : i === 6 ? "市民" : "", 3)
   }
-  const glyphs = row("icons")
+  const glyphs = row("图标")
   glyphs.innerHTML = iconNames.slice(0, 32).map((name) => icon(name, 28)).join("")
   document.body.dataset.ready = "1"
 }

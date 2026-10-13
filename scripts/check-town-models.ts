@@ -14,10 +14,10 @@ page.on("console", e => { if (e.type() === "error") errors.push(e.text()) })
 page.on("response", r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`) })
 const output = "output/inkline-3d/town-review"
 await mkdir(output, { recursive: true })
-const groups = ["Review fixes", "Buildings", "Parks", "Homes & neighbourhoods", "Winter", "Ruins", "People & cargo", "Building condition"]
+const groups = ["修订模型", "建筑", "公园", "住宅与街区", "冬季", "废墟", "人物与货物", "建筑状况"]
 const captureSheet = async () => {
   const previous = await page.locator("#sheet-link").getAttribute("href")
-  await page.getByRole("button", { name: "Save model sheet", exact: true }).click()
+  await page.getByRole("button", { name: "保存模型总览图", exact: true }).click()
   await page.waitForFunction(previous => {
     const link = document.querySelector<HTMLAnchorElement>("#sheet-link")!
     return !link.hidden && link.getAttribute("href") !== previous
@@ -40,17 +40,17 @@ try {
     await writeFile(`${output}/${collection}.png`, Buffer.from(image.split(",")[1]!, "base64"))
     await page.evaluate(() => scrollTo(0, 350))
     await page.screenshot({ path: `${output}/${collection}-page.png` })
-    await page.getByRole("button", { name: "See the back", exact: true }).click()
+    await page.getByRole("button", { name: "查看背面", exact: true }).click()
     assert.equal(await page.locator("output").textContent(), "180°")
-    await page.getByRole("button", { name: "Reset view", exact: true }).click()
-    await page.getByLabel("View elevation").selectOption("50")
+    await page.getByRole("button", { name: "重置视角", exact: true }).click()
+    await page.getByLabel("视角仰角").selectOption("50")
     const rear = await captureSheet()
     assert.ok(rear && rear !== image, `${group}: the exported view must respond to the camera`)
-    await page.getByRole("button", { name: "Reset view", exact: true }).click()
+    await page.getByRole("button", { name: "重置视角", exact: true }).click()
     console.log(`ok ${collection}: ${await page.locator(".model-view").count()} models, rotation, elevation, PNG export`)
   }
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.getByRole("button", { name: "Parks", exact: true }).click()
+  await page.getByRole("button", { name: "公园", exact: true }).click()
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, "Phone preview must fit the viewport")
   await page.screenshot({ path: `${output}/phone.png` })
   assert.deepEqual(errors, [])

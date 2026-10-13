@@ -1,6 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap");
 :root {
-  font-family: "DM Sans", sans-serif;
+  font-family: "DM Sans", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
   color: #3d4943;
   background: #e2e9e6;
   font-synthesis: none;
@@ -55,7 +55,7 @@ h1 {
   margin: 0 0 4px;
 }
 header p {
-  font-family: "DM Mono", monospace;
+  font-family: "DM Mono", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
   font-size: 10px;
   color: #778277;
   margin: 0;
@@ -76,7 +76,7 @@ header a {
   align-items: center;
   padding: 11px;
   gap: 4px;
-  font-family: "DM Mono", monospace;
+  font-family: "DM Mono", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
   font-size: 10px;
 }
 .review {
@@ -127,7 +127,7 @@ header a {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-family: "DM Mono", monospace;
+  font-family: "DM Mono", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
   font-size: 10px;
   line-height: 1.4;
   color: #748073;
@@ -161,7 +161,7 @@ header a {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: "DM Mono", monospace;
+  font-family: "DM Mono", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
   font-size: 10px;
   border-left: 1px solid #cbd1c6;
   padding-left: 12px;
@@ -175,7 +175,7 @@ button {
   border-radius: 4px;
   background: transparent;
   padding: 10px 12px;
-  font-family: "DM Mono", monospace;
+  font-family: "DM Mono", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
   font-size: 11px;
   min-height: 38px;
 }
@@ -191,7 +191,7 @@ button[aria-pressed="true"] {
   padding: 5px 12px;
 }
 output {
-  font-family: "DM Mono", monospace;
+  font-family: "DM Mono", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
   font-size: 10px;
   min-width: 39px;
   text-align: center;
@@ -200,7 +200,7 @@ output {
   position: absolute;
   right: 24px;
   bottom: 94px;
-  font-family: "DM Mono", monospace;
+  font-family: "DM Mono", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
   font-size: 10px;
   color: #7a8980;
   pointer-events: none;

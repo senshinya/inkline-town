@@ -137,7 +137,7 @@ const check = (name: string, ok: boolean, detail: string) => {
   })
   t.run(3.5 * 60)
   const f = t.fate()
-  check("bankrupt", f.state === "lost" && f.reason.startsWith("Bankrupt"), `${f.state} at ${(f.at / 3600).toFixed(1)} min: ${f.reason}`)
+  check("bankrupt", f.state === "lost" && f.reason.startsWith("破产"), `${f.state} at ${(f.at / 3600).toFixed(1)} min: ${f.reason}`)
 }
 
 // Revolt: an angry town, taxed to the hilt and unpaid.
@@ -151,7 +151,7 @@ const check = (name: string, ok: boolean, detail: string) => {
   })
   t.run(2.5 * 60)
   const f = t.fate()
-  check("revolt", f.state === "lost" && f.reason.startsWith("Revolt"), `${f.state} at ${(f.at / 3600).toFixed(1)} min: ${f.reason}`)
+  check("revolt", f.state === "lost" && f.reason.startsWith("叛乱"), `${f.state} at ${(f.at / 3600).toFixed(1)} min: ${f.reason}`)
 }
 
 // Abandoned: a town that once had a hundred people and now has none.
@@ -162,7 +162,7 @@ const check = (name: string, ok: boolean, detail: string) => {
   })
   t.run(2)
   const f = t.fate()
-  check("abandoned", f.state === "lost" && f.reason.startsWith("Abandoned"), `${f.state}: ${f.reason}`)
+  check("abandoned", f.state === "lost" && f.reason.startsWith("废弃"), `${f.state}: ${f.reason}`)
 }
 
 // Over: a term left to run out (a short one, to be quick about it).
@@ -186,10 +186,10 @@ const check = (name: string, ok: boolean, detail: string) => {
   t.run(12 * 60)
   const c = t.snapshot().resources["Town/Crown"]
   const lines = t.snapshot().resources["Town/Chronicle"].lines as Array<{ text: string }>
-  check("crown", c.missed >= 1 && lines.some((l) => l.text.includes("unanswered")), `met ${c.met}, missed ${c.missed}, snubs ${c.snubs.length}`)
+  check("crown", c.missed >= 1 && lines.some((l) => l.text.includes("未按时交付")), `met ${c.met}, missed ${c.missed}, snubs ${c.snubs.length}`)
   t.run(6 * 60)
   const f = t.fate()
-  check("dismissed", f.state === "lost" && f.reason.startsWith("Dismissed"), `${f.state} at ${(f.at / 3600).toFixed(1)} min: ${f.reason}`)
+  check("dismissed", f.state === "lost" && f.reason.startsWith("撤职"), `${f.state} at ${(f.at / 3600).toFixed(1)} min: ${f.reason}`)
 }
 
 // Save and load: a town mid-term loads back to the same state, and runs on the same.
@@ -326,7 +326,7 @@ const entity = (t: ReturnType<typeof town>, id: number) => t.snapshot().entities
     most = Math.max(most, t.snapshot().resources["Town/Census"].burning)
   }
   const ruins = t.snapshot().entities.filter((e) => e.components["Town/Ruin"]?.cause === "burnt").length
-  const news = (t.snapshot().resources["Town/Chronicle"].lines as Array<{ text: string }>).filter((l) => l.text.startsWith("Fire on")).map((l) => l.text)
+  const news = (t.snapshot().resources["Town/Chronicle"].lines as Array<{ text: string }>).filter((l) => l.text.includes("火灾")).map((l) => l.text)
   check("fire spreads", most >= 2 && ruins >= 2, `${most} burning at once, ${ruins} burnt down · ${news.at(-1) ?? "no news"}`)
 }
 
@@ -358,7 +358,7 @@ const entity = (t: ReturnType<typeof town>, id: number) => t.snapshot().entities
   t.run(40)
   const ruins = t.snapshot().entities.filter((e) => e.components["Town/Ruin"]?.cause === "burnt").length
   const standingHomes = homes.filter((id) => entity(t, id)).length
-  const news = (t.snapshot().resources["Town/Chronicle"].lines as Array<{ text: string }>).filter((l) => l.text.startsWith("Fire on")).map((l) => l.text)
+  const news = (t.snapshot().resources["Town/Chronicle"].lines as Array<{ text: string }>).filter((l) => l.text.includes("火灾")).map((l) => l.text)
   check("firefighters", ruins === 1 && standingHomes === 2, `${ruins} burnt down, ${standingHomes} of 3 still standing · ${news.at(-1) ?? "no news"}`)
 }
 

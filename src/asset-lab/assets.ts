@@ -35,8 +35,8 @@ function firTree() {
     step = (24 * size) / (tiers + 1)
   const d = new Drawing(
     "fir",
-    "Fir tree",
-    "A sculpted volume with the original stepped silhouette and two leaf colours. The canopy has real depth."
+    "冷杉",
+    "保留原始阶梯轮廓与双色树叶，树冠具有完整的立体深度。"
   )
   d.face(
     Array.from({ length: 40 }, (_, i): Vertex => {
@@ -81,7 +81,7 @@ function firTree() {
 }
 
 function props() {
-  const d = new Drawing("goods", "Goods & crates", "The same labelled wood crates, plank stacks and stone blocks, completed on all sides.")
+  const d = new Drawing("goods", "货物与货箱", "沿用带标签的木箱、木板堆与石块，补齐所有侧面。")
   d.plate(2)
   d.crate(0.35, 0.3, 0, 0x2f8c87, 3 * U, 12)
   d.crate(-0.15, 0.3, 0, 0x8a58a8, 3 * U, 12)
@@ -115,21 +115,21 @@ for (const tier of [1, 2] as const)
   for (let i = 0; i < 4; i++) {
     if ((tier === 1 && i === 0) || (tier === 2 && i === 1)) continue
     const asset = house(tier, i / 4 + 0.03, `${tier === 1 ? "cottage" : "citizen"}-${names[i]}`)
-    asset.title = `${tier === 1 ? "Cottage" : "Citizen home"} · ${names[i]}`
+    asset.title = `${tier === 1 ? "移民小屋" : "市民住宅"} · ${["赤陶", "板岩", "茅草", "青苔"][i]}`
     additional.push(asset)
   }
 additional.push(house(3))
 for (const tier of [1, 2, 3] as const) for (const appearance of ["fine", "poor", "worn", "winter"] as const) {
   const base = house(tier), a = (home.half + (tier >= 2 ? 1 : 0)) * U
   const model = withAppearance(base, a, home.tiers[tier].height, { band: appearance === "fine" || appearance === "poor" ? appearance : "plain", worn: appearance === "worn", winter: appearance === "winter" }, true)
-  model.id = `${base.id}-${appearance}`; model.title = `${base.title} · ${appearance}`; model.appearance = appearance
-  model.note = appearance === "winter" ? "Snow settles on roof surfaces through the material shader." : appearance === "fine" ? "Fresh plaster and warm windows on the same house mesh." : "Dirt, exposed brick, cracks and roof moss through the material shader."
+  model.id = `${base.id}-${appearance}`; model.title = `${base.title} · ${{ fine: "优质街区", poor: "较差街区", worn: "破旧", winter: "冬季" }[appearance]}`; model.appearance = appearance
+  model.note = appearance === "winter" ? "通过材质着色器在屋顶表面覆盖积雪。" : appearance === "fine" ? "同一住宅模型呈现整洁墙面与温暖窗光。" : "通过材质着色器呈现污迹、裸露砖块、裂缝与屋顶青苔。"
   additional.push(model)
 }
 for (const id of ["granary", "smokehouse", "firewatch", "healer", "hospital", "watchhouse", "builder"] as const) for (const appearance of ["winter", "worn"] as const) {
   const kind = kinds[id], base = makeBuilding(id)
   const model = withAppearance(base, kind.half * U, kind.roof === "gable" ? 20 : kind.stories * 32, { winter: appearance === "winter", worn: appearance === "worn" })
-  model.id = `${id}-${appearance}`; model.title = `${kind.title} · ${appearance}`; model.appearance = appearance
+  model.id = `${id}-${appearance}`; model.title = `${kind.title} · ${{ winter: "冬季", worn: "破旧" }[appearance]}`; model.appearance = appearance
   additional.push(model)
 }
 for (const type of ["fir", "broadleaf", "poplar"] as const)
@@ -145,7 +145,7 @@ additional.push(makeRoadPatch(), makeWater(), ...personCatalogue())
   const asset = groundAsset(cells, new Set(), false, cells)
   const shift = ([u, v, z]: Vertex): Vertex => [u - 8.5, v - 8.5, z]
   asset.faces.forEach(f => { f.points = f.points.map(shift) }); asset.strokes.forEach(s => { s.points = s.points.map(shift) })
-  asset.id = "paved-street"; asset.title = "Paved street"; asset.note = "Raised stone setts with staggered joints and joined edges."; asset.category = "land"; asset.reference = { type: "roads" }; asset.footprint = 3
+  asset.id = "paved-street"; asset.title = "石铺道路"; asset.note = "凸起的石铺路面，接缝交错，边缘相连。"; asset.category = "land"; asset.reference = { type: "roads" }; asset.footprint = 3
   additional.push(asset)
 }
 additional.push(makeSamplePark(), ...propIds.map(makeParkProp))
@@ -168,10 +168,10 @@ additional.push(
 export const inkAssets: ReadonlyArray<InkAsset> = [...approvedAssets, ...additional]
 export const assetById = new Map(inkAssets.map((asset) => [asset.id, asset]))
 export const assetCategoryTitles = {
-  buildings: "Buildings",
-  homes: "Homes",
-  land: "Land",
-  people: "People",
-  cargo: "Cargo & vehicles",
-  construction: "Construction & effects"
+  buildings: "建筑",
+  homes: "住宅",
+  land: "地形",
+  people: "人物",
+  cargo: "货物与车辆",
+  construction: "施工与特效"
 } as const

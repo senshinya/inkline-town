@@ -9,18 +9,18 @@ import "./style.css"
 const root = document.querySelector<HTMLElement>("#map-lab")!
 root.innerHTML = `
   <div id="viewport"></div>
-  <header class="card"><div><h1>Inkline harbour</h1><p>${inkAssets.length} models · complete world asset study</p></div><a href="/asset-lab.html">Asset study ↗</a></header>
-  <section class="review card"><label>Explore <select id="district"></select></label><label>Inspect <select id="inspect"><option value="">Choose an asset…</option></select></label><div><button id="motion" aria-pressed="true">People moving</button><a id="asset-link" href="/asset-lab.html">Compare with original ↗</a></div></section>
-  <aside class="compass card" aria-label="Camera orientation"><span id="north" aria-hidden="true">↑</span><span id="heading">0°</span></aside>
-  <div class="hint card"><span class="desktop-hint">Drag to pan · right-drag to rotate · scroll to zoom</span><span class="touch-hint">Drag to pan · pinch to zoom · switch to Rotate to turn</span><span>WASD / arrows pan · Q / E turn · double-click to focus</span></div>
-  <nav class="card controls" aria-label="Map camera controls">
-    <div class="group"><button id="pan" aria-pressed="true" title="Left-drag or one finger pans the map">Pan</button><button id="rotate" aria-pressed="false" title="Left-drag or one finger rotates the map">Rotate</button></div>
-    <div class="group"><button id="zoom-out" aria-label="Zoom out">−</button><output id="zoom">1.0×</output><button id="zoom-in" aria-label="Zoom in">+</button></div>
-    <div class="group"><button id="turn-left" aria-label="Rotate left 45 degrees">↶</button><button id="turn-right" aria-label="Rotate right 45 degrees">↷</button></div>
-    <label class="tilt">Tilt <input id="tilt" type="range" min="15" max="65" step="1" value="30" aria-label="Camera elevation"><output id="tilt-value">30°</output></label>
-    <button id="reset" title="Restore the original view (Home)">Reset view</button>
+  <header class="card"><div><h1>墨线港湾</h1><p>${inkAssets.length} 个模型 · 完整场景模型展示</p></div><a href="/asset-lab.html">模型图鉴 ↗</a></header>
+  <section class="review card"><label>浏览区域 <select id="district"></select></label><label>查看模型 <select id="inspect"><option value="">选择模型…</option></select></label><div><button id="motion" aria-pressed="true">人物运动中</button><a id="asset-link" href="/asset-lab.html">对照原始绘图 ↗</a></div></section>
+  <aside class="compass card" aria-label="镜头方向"><span id="north" aria-hidden="true">↑</span><span id="heading">0°</span></aside>
+  <div class="hint card"><span class="desktop-hint">拖动平移 · 右键拖动旋转 · 滚轮缩放</span><span class="touch-hint">拖动平移 · 双指缩放 · 选择“旋转”后拖动转向</span><span>WASD / 方向键平移 · Q / E 旋转 · 双击定位</span></div>
+  <nav class="card controls" aria-label="地图镜头控制">
+    <div class="group"><button id="pan" aria-pressed="true" title="左键或单指拖动平移地图">平移</button><button id="rotate" aria-pressed="false" title="左键或单指拖动旋转地图">旋转</button></div>
+    <div class="group"><button id="zoom-out" aria-label="缩小">−</button><output id="zoom">1.0×</output><button id="zoom-in" aria-label="放大">+</button></div>
+    <div class="group"><button id="turn-left" aria-label="向左旋转45度">↶</button><button id="turn-right" aria-label="向右旋转45度">↷</button></div>
+    <label class="tilt">倾斜 <input id="tilt" type="range" min="15" max="65" step="1" value="30" aria-label="镜头仰角"><output id="tilt-value">30°</output></label>
+    <button id="reset" title="恢复初始视角（Home）">重置视角</button>
   </nav>
-  <span class="scene-note">Every model on the island · Original scale</span>
+  <span class="scene-note">岛上展示全部模型 · 原始比例</span>
 `
 const viewport = root.querySelector<HTMLDivElement>("#viewport")!
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true })
@@ -29,7 +29,7 @@ renderer.setClearColor(0xe2e9e6)
 renderer.outputColorSpace = THREE.SRGBColorSpace
 renderer.toneMapping = THREE.NoToneMapping
 renderer.domElement.tabIndex = 0
-renderer.domElement.setAttribute("aria-label", "3D island map. Drag to pan, right-drag to rotate, scroll to zoom.")
+renderer.domElement.setAttribute("aria-label", "3D 岛屿地图。拖动平移，右键拖动旋转，滚轮缩放。")
 viewport.append(renderer.domElement)
 const scene = new THREE.Scene()
 const map = buildAsset(testMap.asset, { batchFaces: true })
@@ -152,7 +152,7 @@ inspect.onchange = () => {
 }
 root.querySelector<HTMLButtonElement>("#motion")!.onclick = () => {
   moving = !moving
-  root.querySelector("#motion")!.textContent = moving ? "People moving" : "People paused"
+  root.querySelector("#motion")!.textContent = moving ? "人物运动中" : "人物已暂停"
   root.querySelector("#motion")!.setAttribute("aria-pressed", String(moving))
 }
 function zoomBy(amount: number) {

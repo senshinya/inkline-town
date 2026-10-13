@@ -9,7 +9,7 @@ import * as Random from "@typeonce/bevy-ts-math/Random"
 
 import { ruinDraft } from "../archetypes.ts"
 import { foods, goodIds, ticks } from "../content.ts"
-import { counted, placeName } from "../places.ts"
+import { placeName } from "../places.ts"
 import { Building, Burning, Charter, Chronicle, Condition, Game, Rules, House, Inventory, Pantry, Recipe, Rising, Rng, Site, Staff, Tile, Time, maybe } from "../schema.ts"
 import { elapsed, write } from "./shared.ts"
 
@@ -61,7 +61,7 @@ export const Decay = Game.System(
         write(
           resources.chronicle,
           t,
-          b ? `The ${kinds[b.kind].title.toLowerCase()} on ${placeName(landmarks, tile)} fell down: nobody mended it.` : `A home on ${placeName(landmarks, tile)} fell down: nobody mended it.`,
+          b ? `${placeName(landmarks, tile)}的${kinds[b.kind].title.toLowerCase()}因无人修缮而坍塌。` : `${placeName(landmarks, tile)}的一栋住宅因无人修缮而坍塌。`,
           true,
           tile
         )
@@ -103,9 +103,9 @@ export const Decay = Game.System(
           if (data.staff.get().assigned > 0 && (foods as ReadonlyArray<string>).includes(r.output)) made += (r.batch * 3600) / r.period
         }
         const cause = made > p.eaten * 1.5
-          ? `the town makes about ${Math.round(made)} food a minute and eats ${p.eaten}: fewer fisheries, a smokehouse, or selling fish would stop the waste`
-          : `a granary keeps fish and bread five times as long, and smoked fish keeps`
-        write(resources.chronicle, t, `${counted(p.rotted, "fish or loaf", "fish and loaves")} rotted in store this minute: ${cause}.`, true)
+          ? `城镇每分钟约生产 ${Math.round(made)} 份食物，消耗 ${p.eaten} 份：减少渔场、建熏鱼坊或出售鲜鱼可避免浪费`
+          : `粮仓可使鲜鱼和面包的腐坏速度降至五分之一，熏鱼不会腐坏`
+        write(resources.chronicle, t, `本分钟库存中有 ${p.rotted} 份鲜鱼或面包腐坏：${cause}。`, true)
       }
       resources.pantry.set({ eaten: 0, rotted: 0, eatenLast: p.eaten, rottedLast: p.rotted, warned: warn ? t : p.warned })
     }

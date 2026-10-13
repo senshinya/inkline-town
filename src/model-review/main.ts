@@ -4,21 +4,21 @@ import { buildAsset, exportAsset } from "../asset-lab/renderer.ts"
 import "./style.css"
 
 const families = {
-  fixes: { title: "Review fixes", ids: ["mill","bakery","weaver","warehouse","mine","farm","chapel","hospital","smokehouse","builder","townhouse","quarry","stone-full","stone-quarried","ore-full","problem-marker","smoke","firewatch"] },
-  buildings: { title: "Buildings", ids: ["granary", "smokehouse", "firewatch", "healer", "hospital", "watchhouse", "builder"] },
-  ornaments: { title: "Parks", ids: ["park-sample", "park-lamp", "park-fountain", "park-statue", "paved-street"] },
-  homes: { title: "Homes & neighbourhoods", ids: ["cottage", "citizen", "townhouse", "cottage-fine", "citizen-fine", "townhouse-fine", "cottage-poor", "citizen-worn", "townhouse-worn"] },
-  winter: { title: "Winter", ids: ["cottage-winter", "citizen-winter", "townhouse-winter", "granary-winter", "smokehouse-winter", "firewatch-winter", "healer-winter", "hospital-winter", "watchhouse-winter", "builder-winter"] },
-  hazards: { title: "Ruins", ids: ["ruin-burnt-1", "ruin-collapsed-1", "ruin-derelict-1"] },
-  people: { title: "People & cargo", ids: ["service-watchman", "service-firefighter", "service-physician", "service-constable", "service-builder", "goods-smoked", "cart-smoked-4", "barrow-smoked-4"] },
-  wear: { title: "Building condition", ids: ["granary-worn", "smokehouse-worn", "firewatch-worn", "healer-worn", "hospital-worn", "watchhouse-worn", "builder-worn"] }
+  fixes: { title: "修订模型", ids: ["mill","bakery","weaver","warehouse","mine","farm","chapel","hospital","smokehouse","builder","townhouse","quarry","stone-full","stone-quarried","ore-full","problem-marker","smoke","firewatch"] },
+  buildings: { title: "建筑", ids: ["granary", "smokehouse", "firewatch", "healer", "hospital", "watchhouse", "builder"] },
+  ornaments: { title: "公园", ids: ["park-sample", "park-lamp", "park-fountain", "park-statue", "paved-street"] },
+  homes: { title: "住宅与街区", ids: ["cottage", "citizen", "townhouse", "cottage-fine", "citizen-fine", "townhouse-fine", "cottage-poor", "citizen-worn", "townhouse-worn"] },
+  winter: { title: "冬季", ids: ["cottage-winter", "citizen-winter", "townhouse-winter", "granary-winter", "smokehouse-winter", "firewatch-winter", "healer-winter", "hospital-winter", "watchhouse-winter", "builder-winter"] },
+  hazards: { title: "废墟", ids: ["ruin-burnt-1", "ruin-collapsed-1", "ruin-derelict-1"] },
+  people: { title: "人物与货物", ids: ["service-watchman", "service-firefighter", "service-physician", "service-constable", "service-builder", "goods-smoked", "cart-smoked-4", "barrow-smoked-4"] },
+  wear: { title: "建筑状况", ids: ["granary-worn", "smokehouse-worn", "firewatch-worn", "healer-worn", "hospital-worn", "watchhouse-worn", "builder-worn"] }
 } as const
 type Family = keyof typeof families
 const root = document.querySelector<HTMLElement>("#review")!
-root.innerHTML = `<header><a href="/">Inkline Town</a><span>PR 03 / MODEL REVIEW</span><a href="/map-lab.html">Town map ↗</a></header>
-  <section class="intro"><div><p class="eyebrow">A town with a little more life</p><h1>New places.<br>The same ink.</h1><p>Inspect the models together, turn them around, then open any one for a closer look.</p></div><aside>7 buildings<br>3 park furnishings<br>3 home tiers<br><span>Plus people, hazards, paving,<br>snow and signs of wear.</span></aside></section>
-  <nav aria-label="Model collections"></nav><section class="camera"><label>Turn the models <input aria-label="Model rotation" type="range" min="-180" max="180" value="0"><output>0°</output></label><button id="rear">See the back</button><button id="reset">Reset view</button><button id="sheet">Save model sheet</button><a id="sheet-link" hidden download>Download sheet ↗</a><label>View <select aria-label="View elevation"><option value="30">Street angle</option><option value="50">From above</option><option value="15">Near the ground</option></select></label></section>
-  <section class="grid" aria-label="3D models"></section><footer><a href="/park-lab.html">Built park & running water ↗</a> · <a href="/effects-lab.html">Animated house effects ↗</a> · Drag a model to turn the collection · <a href="/asset-lab.html">Full asset catalogue ↗</a> · <a href="/">Play this town ↗</a></footer>`
+root.innerHTML = `<header><a href="/">墨线小镇</a><span>PR 03 / 模型预览</span><a href="/map-lab.html">城镇地图 ↗</a></header>
+  <section class="intro"><div><p class="eyebrow">让城镇更有生机</p><h1>新的街景。<br>熟悉的墨线。</h1><p>成组查看模型并旋转视角，也可打开单个模型查看细节。</p></div><aside>7 种建筑<br>3 种公园设施<br>3 个住宅等级<br><span>还有人物、灾害、石铺道路、<br>积雪与磨损效果。</span></aside></section>
+  <nav aria-label="模型合集"></nav><section class="camera"><label>旋转模型 <input aria-label="模型旋转" type="range" min="-180" max="180" value="0"><output>0°</output></label><button id="rear">查看背面</button><button id="reset">重置视角</button><button id="sheet">保存模型总览图</button><a id="sheet-link" hidden download>下载总览图 ↗</a><label>视角 <select aria-label="视角仰角"><option value="30">街道视角</option><option value="50">俯视</option><option value="15">近地视角</option></select></label></section>
+  <section class="grid" aria-label="3D 模型"></section><footer><a href="/park-lab.html">公园布局与流水 ↗</a> · <a href="/effects-lab.html">住宅动态特效 ↗</a> · 拖动模型旋转整组视角 · <a href="/asset-lab.html">完整模型图鉴 ↗</a> · <a href="/">进入游戏 ↗</a></footer>`
 const nav = root.querySelector("nav")!, grid = root.querySelector<HTMLElement>(".grid")!, rotation = root.querySelector<HTMLInputElement>("input")!, elevation = root.querySelector<HTMLSelectElement>("select")!
 const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true })
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.outputColorSpace = THREE.SRGBColorSpace
@@ -55,7 +55,7 @@ function select(next: Family) {
     const asset = assetById.get(id)!
     if (!asset) throw new Error(`Missing review model: ${id}`)
     const card = document.createElement("article")
-    card.innerHTML = `<div class="card-top"><span>${String(i + 1).padStart(2, "0")}</span><a href="/asset-lab.html?asset=${id}">Inspect ↗</a></div><div class="model-view" role="img" aria-label="${asset.title} 3D model"></div><div class="caption"><h2>${asset.title}</h2><p>${asset.note}</p><button class="export">Download GLB</button></div>`
+    card.innerHTML = `<div class="card-top"><span>${String(i + 1).padStart(2, "0")}</span><a href="/asset-lab.html?asset=${id}">查看详情 ↗</a></div><div class="model-view" role="img" aria-label="${asset.title} 3D 模型"></div><div class="caption"><h2>${asset.title}</h2><p>${asset.note}</p><button class="export">下载 GLB</button></div>`
     grid.append(card)
     const built = buildAsset(asset, {batchFaces: true}), scene = new THREE.Scene(), camera = new THREE.OrthographicCamera(-100, 100, 100, -100, 0.1, 4000)
     scene.add(built.group); scene.updateMatrixWorld(true)
@@ -80,8 +80,8 @@ root.querySelector<HTMLButtonElement>("#sheet")!.onclick = () => {
   const canvas = document.createElement("canvas"), ctx = canvas.getContext("2d")!, columns = 3, width = 400, height = 350
   canvas.width = columns * width; canvas.height = 100 + Math.ceil(models.length / columns) * height
   ctx.fillStyle = "#f0f2ec"; ctx.fillRect(0, 0, canvas.width, canvas.height)
-  ctx.fillStyle = "#3d4943"; ctx.font = "30px Georgia"; ctx.fillText(`Inkline Town / ${families[family].title}`, 30, 48)
-  ctx.font = "13px monospace"; ctx.fillText(`PR 03 · ${Math.round(yaw)}° rotation · ${pitch}° elevation`, 30, 76)
+  ctx.fillStyle = "#3d4943"; ctx.font = "30px Georgia"; ctx.fillText(`墨线小镇 / ${families[family].title}`, 30, 48)
+  ctx.font = "13px monospace"; ctx.fillText(`PR 03 · 旋转 ${Math.round(yaw)}° · 仰角 ${pitch}°`, 30, 76)
   renderer.setSize(width, 270, false); renderer.setScissorTest(false)
   models.forEach((model, i) => {
     const camera = model.camera, heading = (45 + yaw) * Math.PI / 180, angle = pitch * Math.PI / 180,

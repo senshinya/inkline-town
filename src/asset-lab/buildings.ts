@@ -50,12 +50,12 @@ export function makeBuilding(id: KindId, options: BuildingOptions = {}) {
     id,
     kind.title,
     townBuildingNotes[id] ?? (id === "mill"
-      ? "Upright lattice sails, a tapered roof and coopered flour barrels in the mill yard."
+      ? "直立的格栅式风车叶片、渐窄的屋顶，以及院子里带桶箍的木制面粉桶。"
       : id === "market"
-        ? "Striped canopy, coloured goods crates and roof flag, all built as geometry."
+        ? "条纹棚顶、彩色货箱与屋顶旗帜，均以几何模型构成。"
         : id === "townhall"
-          ? "Two storeys, clock faces, violet trim, three skylights and a red flag. Original dimensions throughout."
-          : "Original footprint, palette and yard details, with complete walls and roof geometry.")
+          ? "两层建筑、钟面、紫色饰边、三扇天窗与红旗，全部沿用原始尺寸。"
+          : "沿用原始占地、配色和院落细节，补齐墙体与屋顶模型。")
   )
   d.asset.category = "buildings"
   d.asset.reference = { type: "building", kind: id }

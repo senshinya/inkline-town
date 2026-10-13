@@ -1,206 +1,76 @@
-# How to play
+# 玩法指南
 
-[← back to the README](../README.md)
+[← 返回项目介绍](../README.md)
 
-Everything a mayor needs to know: how a term runs, what puts pressure on the
-town, the levers you hold, how a term ends, and how the town works underneath.
+本指南介绍操作方式、任期规则、城镇面临的压力、可调整的政策，以及城镇的运作方式。
 
-## Controls
+## 操作
 
-| | |
+| 操作 | 功能 |
 |---|---|
-| drag, arrow keys | pan the map (road/home tools drag to build) |
-| right-drag, or drag with **Rotate** selected | rotate and tilt the 3D map |
-| **Q**, **E** | rotate left/right |
-| mouse wheel, **+** / **−** | zoom |
-| two fingers | pan, pinch to zoom, twist to rotate |
-| **Home**, camera reset button | restore the original view |
-| **S** | select: click a building or a home to see what it does |
-| **R** | road: drag to lay one |
-| **P** | pave: drag along a road to pave it (coins and a stone a cell): carriers and walkers go half again as fast on it |
-| **H** | homes: drag to lay a row along a road |
-| **B** | build: pick a building, then click the map |
-| **X** | bulldoze |
-| **T** | the town panel: goals, approval, treasury, taxes, people, the crown, trade |
-| **D**, **W**, **F**, **A**, **O**, **C** | map views: desirability, workers, fire, health (aid), order, condition; the same key again hides it |
-| **space** | pause |
-| **1**, **2**, **3** | run at 1×, 2×, 4× |
-| **Esc** | stop placing, close the panel |
+| 拖动、方向键 | 平移地图；道路与住宅工具通过拖动建造 |
+| 右键拖动，或选择“旋转”后拖动 | 旋转并倾斜 3D 地图 |
+| **Q**、**E** | 向左、向右旋转 |
+| 鼠标滚轮、**+** / **−** | 缩放 |
+| 双指手势 | 平移、捏合缩放、扭转旋转 |
+| **Home**、重置镜头按钮 | 恢复初始视角 |
+| **S** | 选择：点击建筑或住宅查看详情 |
+| **R** | 道路：拖动铺设 |
+| **P** | 铺石：沿道路拖动，每格消耗金币和石料；运输员与服务人员速度提高50% |
+| **H** | 住宅：沿道路拖动建造一排住宅 |
+| **B** | 建造：选择建筑，再点击地图放置 |
+| **X** | 拆除 |
+| **T** | 城镇面板：目标、支持度、财政、税率、人口、王室与贸易 |
+| **D**、**W**、**F**、**A**、**O**、**C** | 地图视图：宜居度、劳动力、火灾、健康、治安、建筑状况；再次按下隐藏 |
+| **空格** | 暂停或继续 |
+| **1**、**2**、**3** | 以 1×、2×、4× 速度运行 |
+| **Esc** | 取消放置、关闭面板 |
 
-Save, load, and new town sit in the bottom right. The town also autosaves
-every two minutes of game time, and **load** takes whichever save is newer.
-New town and load ask before they replace the town you have.
+右下角有“保存”“读取”和“新城镇”。游戏每两分钟游戏时间自动保存一次。“读取”选择最新的手动或自动存档。读取存档与建立新城镇前，界面会提示保存当前进度。
 
-## A term in office
+## 市长任期
 
-- **The charter**: a new town is founded on land you choose: its size
-  (small, medium, large), its richness (rich, fair, harsh: forests, stone,
-  ore, lakes, and the starting treasury), and the length of the term (45,
-  60, or 90 minutes at 1×). The land is an island-like stretch with a
-  wandering coast and capes reaching out; the same seed always makes the
-  same land.
-- **Pressure** builds as the town grows:
-  - *winters*: a term is six years, and every year but the first ends in a
-    winter when fields do not grow, fisheries catch half as much, and homes
-    eat faster;
-  - *administration*: the town hall costs more per home the more homes
-    there are, so a big town of poor homes cannot pay its way;
-  - *the crown* asks for goods the town makes, more as the term goes on;
-    sending them pays, and an unanswered request is a fine and a snub the
-    town remembers;
-  - *the market*: prices fall the more the town sells and rise the more
-    it buys; stone and ore run out;
-  - *approval*, from -100 to 100, follows needs met, taxes, unpaid wages,
-    snubs from the crown, and hungry winters, and decides how many people
-    each home holds. Taxes above 125% also leave a *grudge* that builds
-    for as long as they stay high and fades over ten minutes or so, so a
-    term of squeezing cannot be undone by cutting taxes at the end.
-- **The levers**: taxes per tier; for each good, sell beyond the reserve,
-  buy up to it (at half again the price), or neither; the reserve itself;
-  pausing a building (no workers, a quarter of its upkeep); answering the
-  crown; and the speed of time (space pauses, 1, 2, 3 for 1×, 2×, 4×).
-- **The end**: the town is *complete* once it holds every goal for two
-  minutes (enough residents and coins for its size, three in ten of them
-  citizens, approval 15 or more, not losing coins over the last minute); you may retire or keep
-  governing. It is *lost* to bankruptcy (three minutes in debt), revolt
-  (approval at -50 or below for two minutes), abandonment (people fall
-  below 15% of their peak), or dismissal (three of the crown's requests
-  missed in a row). Otherwise the term runs out, and the town
-  is judged flourishing, holding on, or declining. The reckoning shows the
-  term's history and its chronicle.
+- **建城章程**：选择地图大小（小型、中型、大型）、资源丰度（富饶、适中、贫瘠）和任期长度（正常速度下45、60或90分钟）。资源丰度影响森林、石料、矿石、湖泊及初始资金。同一种子始终生成相同地图。
+- **压力**随城镇发展而增加：一届任期包含六年，除第一年外，每年末都有冬季；农田停产、捕鱼减少、食物消耗加快。住宅越多，每栋住宅分摊的行政开支越高。王室定期限时索要物资，要求随任期推进增加；按时交付获得金币，逾期受罚并降低支持度。物资卖得越多价格越低，买得越多价格越高，石料与矿石也会耗尽。
+- **支持度**范围为−100至100，受需求满足程度、税率、工资拖欠、王室不满与冬季饥饿影响，决定住宅的入住上限。税率超过125%会持续积累怨恨，降税后仍需数分钟慢慢消退；任期末才降税无法抵消长期高税率。
+- **政策**：分别调整移民与市民税率；为每种物资选择出售超出保留量的部分、买入至保留量，或不交易。购买价格为出售价格的1.5倍。暂停建筑后不雇佣工人，维护费降至四分之一。你还可以交付王室要求，并调整游戏速度。
+- **结局**：同时达成所有目标并维持两分钟，即可完成城镇建设：达到对应地图的人口与金币要求、市民占比至少30%、支持度至少15、最近一段时间平均收支不亏损。此后可结束任期或继续执政。连续负债三分钟、支持度持续两分钟不高于−50、人口跌至历史峰值的15%以下（峰值至少40人），或连续三次未交付王室要求，任期失败。否则到期后评为欣欣向荣、勉强维持或走向衰败。结算页记录任期曲线与大事记。
 
-## The neighbourhood
+## 街区布局
 
-The town is meant to look and work like a real one: a fine centre, an
-industrial edge, and workers' cottages clustered by the mill or the mine.
-Nobody tells you to build it that way; it works best that way.
+城镇适合形成优美的中心、外围工业区，以及磨坊或矿场附近的工人小屋。无需按固定模板建造，但周围环境与步行距离会直接影响经营。
 
-- **Desirability.** Every cell has one. Buildings and the land add to it or
-  take from it, fading with distance: a smithy, quarry, or mine takes 8
-  beside it and less out to four cells; a sawmill, bakery, mill, or
-  smokehouse 4; warehouses, farms, a granary, a builder's yard 2. Water and
-  woods give 2, a market 2 and a chapel 4, the town hall 4, and a paved
-  street 1 beside it. Ruins and run-down homes take a little. Every point
-  counts: below 0 a home holds fewer residents (a twentieth fewer a point,
-  down to half) and pays less (a fortieth a point, down to three quarters);
-  above 0 it pays more, up to a quarter more. A home's panel says what its
-  street is made of, and what keeps it from the next tier.
-- **Parks** are laid out cell by cell from the build menu. Drag a
-  rectangle of ground (lawn, flower beds, gravel walks, a paved square),
-  then click a cell of it to set a furnishing (a lamp, a fountain once 30
-  live in town, a statue once 20 are citizens). Ground that touches is one
-  park, and the whole park is what the streets around it feel: its beauty
-  adds up from its ground (at most 4), its furnishings (the first of a
-  kind in full, each more of it half as much, and one for every two
-  cells), and its ways in from the street (a walk or a square beside a
-  road: 1.5 each, two count), up to 15, out to 2 cells and one more for
-  every 6 cells of park, up to 5. A lone statue is worth little; a lawn
-  with walks in from the street, lamps, and a statue is worth a street of
-  citizens.
-  Parks cost upkeep by the cell and by the furnishing: a fine centre is
-  something you choose to pay for. Bulldozing a cell takes its furnishing
-  first, then its ground.
-- **Tiers.** Settlers live anywhere. A citizens' home needs desirability 5
-  as well as bread, cloth, and faith; a home whose street drops below 5
-  goes back to settlers even with every need met. A **townhouse** of
-  burghers (12 residents, the best taxes) needs desirability 15 and a
-  fire watch, a healer, and a watch house all calling on it. At
-  desirability −5 or less a home is squalid and holds fewer people.
-- **Workers by tier, and the commute.** Settlers do the rough work
-  (lumberjack, forester, quarry, mine, fishery, smokehouse, farm, sheep,
-  storage, fire watch, watch house, builder's yard); citizens the skilled
-  (sawmill, smithy, mill, bakery, weaver, market, chapel, healer,
-  hospital). Skilled jobs take their own crew first; citizens left over do
-  rough work, and until there are citizens, settlers stand in at a
-  skilled job as apprentices, at three-quarters pace. The jobs counter in
-  the top right says how many workplaces are short, and clicking it visits
-  them in turn. A home only supplies workers to
-  workplaces within 15 road cells, so a distant mine needs its own workers'
-  cottages beside it (they stay settlers in its dust, which is what it
-  needs). A workplace short of workers says whether anyone lives within
-  reach.
+- **宜居度**：每格都有宜居度，建筑和地形的影响随距离衰减。铁匠铺、采石场和矿场在紧邻处降低8点，影响至四格外；锯木厂、面包坊、磨坊和熏鱼坊降低4点；仓库、农场、粮仓和修缮工坊降低2点。水域与树林增加2点，市场增加2点，教堂与市政厅增加4点，石铺道路在旁边增加1点。废墟和破旧住宅也会降低宜居度。低于0时，每下降一点，住宅容量系数减少 1/12（最低为 50%），税收系数减少 1/40（最低为 75%）；高于0可增加税收，最多增加25%。住宅详情会列出街区的影响来源和升级障碍。
+- **公园**：在建造菜单中先拖出矩形铺设草坪、花坛、碎石小径或石铺广场，再点击格子摆放路灯、喷泉或雕像。喷泉在城镇达到30人时解锁，雕像在市民达到20人时解锁。相邻地块合为一座公园，美观值由地面、设施和入口共同决定：地面最多计入4点；同类设施的第一件全额计入，之后每件效果减半，每两格地面可计入一件设施；小径或广场紧邻道路构成入口，每个增加1.5点，最多计入两个。公园影响值最高15，基础范围两格，每六格公园地面再增加一格范围，最大五格。设施和地面都有维护费。拆除格子时先移除设施，再移除地面。
+- **住宅等级**：移民可住在任何街区。市民住宅需要面包、布料、信仰，以及至少5点宜居度；街区跌破5时，即使物资齐全，也会降级为移民小屋。**市民宅邸**供富裕市民居住，最多容纳12人，基础税收最高，需要至少15点宜居度，并由消防站、医馆和治安所同时覆盖。宜居度不高于−5的街区被视为脏乱，会减少入住人数。
+- **工人阶层与通勤**：移民负责伐木、植树、采石、采矿、捕鱼、熏鱼、耕作、牧羊、仓储、消防、治安与修缮等基础劳动；市民负责锯木、锻造、磨粉、烘焙、织布、市场、教堂和医疗等技术工作。技术岗位优先使用市民，移民可作为学徒代岗，效率为75%。右上角就业计数显示缺人的工作场所，点击可逐一定位。居民只向十五格道路以内的工作场所提供劳动力，因此远处矿场需要附近的工人小屋。缺人的建筑会说明范围内是否有居民。
 
-## Services, and what goes wrong without them
+## 服务与灾害
 
-Every home has three risk meters that rise slowly, at a pace fixed by where
-it stands, and every building a fire meter. A walker from the matching
-service resets one as it passes. Past half way a sign goes up over the home (a
-smoke wisp, a pale face, a broken window) and the map views turn it red;
-disaster comes only if the meter reaches the top. The views colour the
-buildings themselves, not only the ground under them.
+每栋住宅有火灾、疾病、治安三种风险，其他建筑也有火灾风险。风险缓慢增加，速度由周围环境决定，对应服务人员经过时可重置。超过一半时，建筑出现烟雾、病态外观或破损窗户等预警，地图视图也将其标红；只有风险达到上限才会发生灾害。视图会同时为建筑和地面着色。
 
-| Service | Building | What raises the risk | If neglected |
+| 服务 | 建筑 | 增加风险的因素 | 缺乏服务的后果 |
 |---|---|---|---|
-| fire | **fire watch**: a watchman, and firefighters who run to any blaze | wooden settlers' cottages, a bakery, smithy, or smokehouse within two cells, crowding, a run-down building, heating in a hard winter | the home catches fire; it burns for 20 seconds and may set its neighbours alight. When firefighters arrive, that house is lost but the fire goes no further. A ruin is left to clear |
-| health | **healer**, later a **hospital** | hunger, crowding, desirability below 0, a quarry's or mine's dust, still water | sickness: the home holds half as many until it passes or a physician calls, and it raises the risk of homes around it |
-| order | **watch house**: a constable | approval below 0, desirability below 0, a half-empty home, a burghers' townhouse | a theft (coins, or goods when the treasury is empty), then the home is left derelict |
+| 消防 | **消防站**：巡查员降低风险，消防员赶赴火场 | 木制小屋、两格内的面包坊/铁匠铺/熏鱼坊、拥挤、建筑破旧、严冬取暖 | 建筑着火并燃烧20秒，可能蔓延。消防员到达时，起火建筑仍会损失，但能阻止蔓延；留下的废墟需要清理 |
+| 医疗 | **医馆**，后续可建**医院** | 饥饿、拥挤、宜居度低于0、采石与采矿粉尘、静水 | 住户患病期间，住宅容量减半，直到自然恢复或医师来访，并增加周围住宅的疾病风险 |
+| 治安 | **治安所**：警员巡逻 | 支持度低于0、宜居度低于0、住宅半空、市民宅邸 | 先遭窃，盗贼偷走金币，财政耗尽时偷物资；多次遭窃后住宅可能荒废 |
 
-A good layout prevents disasters: streets between rows of homes stop a fire
-from spreading, a fire watch near the cottages gets firefighters there in
-time, and industry away from homes keeps them healthy and orderly. The town
-ticker under the top bar lists what needs attention *now* (fires, sickness,
-workshops that have waited half a minute for inputs, workplaces nobody can
-walk to, no food in store) and, under *lately*, the news of the last minute
-and a half, which also pops up as it happens. Click a line to go there.
+合理布局能减少灾害：道路隔开住宅可阻断火势，消防站靠近小屋可及时赶到，工业远离住宅可改善健康与治安。顶部下方的提醒列出当前火灾、疾病、长期等待原料的工坊、无人能到达的岗位和食物短缺；“最近动态”显示近一分钟半的大事。点击消息可定位现场。
 
-## Wear, spoilage, and winters
+## 磨损、腐坏与冬季
 
-- **Food spoils in store**: fish keeps about three minutes, bread about
-  five; wheat, flour, and smoked fish keep. A **granary** keeps fish and
-  bread five times as long, and a **smokehouse** turns fish into smoked
-  fish, which keeps through any winter. Markets hand settlers fresh fish
-  first, and a loaf besides when they have none: a cottage with bread on
-  the table pays a quarter more, so bread is worth baking before anyone is
-  a citizen. When food rots, the news says whether the town simply makes
-  more than it eats.
-- **Tools wear out**: a lumberjack, quarry, mine, sawmill, mill, bakery,
-  weaver, or smokehouse uses up a tool every 50 or 60 jobs, and works at
-  half pace without one. Carriers keep one on hand at each.
-- **Buildings and homes run down**, in about half an hour to half and an
-  hour and more to nothing. A **builder's yard** sends a builder to mend whatever is run
-  down along the way, a plank for a home and a plank and a stone for a
-  building. Below half, a workshop works at half pace and its fire risk
-  rises, and a home looks worn and drags its street down; at nothing it
-  falls into a ruin.
-- **Winters vary**: each year's is mild (fishing at 75%), normal (50%), or
-  hard (half as long again, fishing at 25%, and heating raises every home's
-  fire risk), rolled from the seed. The almanac in the clock shows the
-  coming winter a year ahead (hover it for the one after), a minute before
-  each winter the news says how much food is in store and how much the
-  town eats a minute, and through winter the map lies frosted.
+- **食物会逐渐腐坏**：鲜鱼和面包在库存中持续损耗，鲜鱼腐坏更快；小麦、面粉和熏鱼不会腐坏。**粮仓**将鲜鱼与面包的腐坏速度降至五分之一，**熏鱼坊**把鲜鱼加工成能储存整个冬季的熏鱼。市场优先向移民供应鲜鱼，也会供应面包；供应面包的小屋税收增加50%，因此在出现市民之前生产面包也有收益。食物腐坏时，消息会说明是否生产过剩。
+- **工具会损耗**：伐木场、采石场、矿场、锯木厂、磨坊、面包坊、织布坊和熏鱼坊每工作50或60次消耗一件工具，无工具时效率减半。运输员负责补充。
+- **建筑会破旧**：约半小时后状况降至一半，一小时以上后接近零。**修缮工坊**派工匠维修沿途建筑：住宅消耗一块木板，其他建筑消耗一块木板和一份石料。状况低于一半时，工坊效率减半，火灾风险升高；住宅外观破旧并降低街区宜居度。状况归零则坍塌成废墟。
+- **冬季强度不同**：根据种子生成暖冬（捕鱼量75%）、普通冬季（50%）或严冬（40%）。严冬时长增加50%，住宅取暖提高火灾风险。时钟中的年历提前一年显示下个冬季，悬停可查看再下一个。冬季前一分钟，消息提示食物库存与每分钟消耗；冬季地图覆盖霜雪。
 
-## How the town works
+## 城镇如何运作
 
-- **A new town** has a town hall in a clearing, ringed by road, plus
-  starting coins and goods.
-- **Coins**: homes the town hall can reach by road pay taxes, in proportion
-  to the needs they have met: a hungry home pays nothing, a cottage with
-  bread pays half again, a fine street up to a quarter more, and the town
-  panel says what the same homes would pay if every one were supplied; traders buy
-  what the town sells and sell it what it buys; every building costs upkeep
-  and the town hall costs administration. Building costs coins up front.
-  The **town** panel (T, the town button, or the people in the top right) shows the goals, approval,
-  treasury, people, supplies, the crown, goods and trade, and the
-  chronicle, and holds the levers.
-- **Materials** (planks, stone, tools) come from storage: a new building is a
-  site until carriers have brought what it costs, then it goes up.
-- **Homes** fill with settlers once a road touches them. Settlers need food
-  (fish, smoked fish, or bread); with bread, cloth, and faith on a street
-  with desirability 5 a home becomes a two-story citizens' home that holds
-  and pays twice as much, and on a fine street (15) with every service
-  calling, a three-story townhouse. Cloth is only brought to a street fit
-  for citizens, however much is in store: the home's panel says so, and
-  what the street is short of.
-- **Buildings** need a road at the middle of a side and workers of their
-  crew from homes within 15 road cells. While one is placed (or selected),
-  the roads its walkers or its workers would use are shown; the homes tool
-  shows how far its residents would walk to work. Parks need no road and no
-  workers; their stone comes straight out of storage. Gatherers work the land within their reach (trees, rocks, water,
-  fields); workshops turn one good into another.
-- **Carriers** walk every good along the roads: producers send to whoever
-  wants it (a site, a workshop, a market) or else to storage; storage sends
-  to whoever wants what it holds.
-- **Walkers** from the town hall and markets hand out food and cloth to the
-  homes they pass; the chapel's brings faith; a fire watch's, a healer's,
-  and a watch house's keep down the risks; a builder's mends.
-- Larger buildings unlock as the town grows (by residents, then citizens).
+- **新城镇**从空地中的市政厅开始，周围已有道路，并配有初始金币与物资。
+- **金币**来自市政厅可沿道路到达的住宅税收与贸易收入。税额随需求满足程度变化：挨饿住宅不纳税，供应面包的小屋多缴50%，优质街区最多多缴25%。城镇面板还显示所有需求均满足时的潜在税收。建筑有维护费，市政厅有行政开支，建造时另付费用。按 **T**、点击“城镇”或右上角人口即可打开面板。
+- **建材**来自库存。新建筑先成为工地，运输员送齐木板、石料与工具后开始施工。
+- **住宅**连接道路后移民会自行入住。移民需要鲜鱼、熏鱼或面包；在宜居度达到5的街区满足面包、布料与信仰需求后，可升级为两层市民住宅；宜居度达到15且各项服务覆盖后，可升级为三层市民宅邸。无论库存多少，布料都只配送到适合市民的街区，住宅面板会解释原因。
+- **建筑**一侧中点需要连接道路，工人来自十五格道路以内的住宅。放置或选择建筑时，可看到服务范围或通勤范围；住宅工具也显示居民上班范围。公园不需要工人或道路，所需石料直接扣除库存。采集建筑使用范围内的树木、岩石、水域与农田，工坊则加工物资。
+- **运输员**沿道路搬运所有货物。生产建筑优先送往需要物资的工地、工坊或市场，否则送入仓库；仓库再向有需求的建筑供货。
+- **服务人员**从市政厅与市场配送食物和布料，教堂提供信仰，消防站、医馆与治安所降低风险，修缮工坊维修建筑。
+- 更高级的建筑随城镇人口与市民人数增加而解锁。

@@ -6,8 +6,8 @@ import { U } from "../iso.ts"
 export function makeSite(share: number, size = 2) {
   const d = new Drawing(
     `site-${share === 0 ? "empty" : "supplied"}`,
-    share === 0 ? "Marked construction site" : "Supplied construction site",
-    "Stakes, ropes and incoming materials, using the original site proportions."
+    share === 0 ? "已划定的工地" : "建材已送达的工地",
+    "沿用原始工地比例，展示木桩、绳索与送达的建材。"
   )
   d.asset.category = "construction"
   d.asset.reference = { type: "site", share }
@@ -47,8 +47,8 @@ export function makeConstruction(kindId: KindId, progress: number) {
     stage = buildStages(progress)
   const d = new Drawing(
     `build-${kindId}-${progress}`,
-    `${kind.title} · ${progress < 0.5 ? "frame" : "walls"}`,
-    "The same construction timing and frame/wall dimensions as the 2D drawing."
+    `${kind.title} · ${progress < 0.5 ? "框架" : "墙体"}`,
+    "沿用 2D 绘图的施工阶段及框架、墙体尺寸。"
   )
   d.asset.category = "construction"
   d.asset.reference = { type: "building", kind: kindId, build: progress }
@@ -75,7 +75,7 @@ export function makeConstruction(kindId: KindId, progress: number) {
   return d.asset
 }
 export function makeMarker() {
-  const d = new Drawing("problem-marker", "Problem marker", "The original red exclamation mark, as a thin world-space sign.")
+  const d = new Drawing("problem-marker", "警示标记", "原始红色感叹号，呈现为场景中的薄片警示牌。")
   d.asset.category = "construction"
   d.asset.reference = { type: "none" }
   d.asset.footprint = 1
@@ -88,7 +88,7 @@ export function makeMarker() {
   return d.asset
 }
 export function makeSmoke() {
-  const d = new Drawing("smoke", "Chimney smoke", "Animated soft smoke rises and disperses from a flue. The plume uses the same particle shader as the live game.")
+  const d = new Drawing("smoke", "烟囱烟雾", "柔和烟雾从烟道升起并消散，与游戏共用粒子着色器。")
   d.asset.category = "construction"
   d.asset.reference = { type: "none" }
   d.asset.footprint = 1
@@ -99,7 +99,7 @@ export function makeSmoke() {
   return d.asset
 }
 export function makePlot(look: "hover" | "picked" | "blocked" | "reach") {
-  const d = new Drawing(`plot-${look}`, `Plot · ${look}`, "Ground-space placement and reach outlines, preserving the original ink colours.")
+  const d = new Drawing(`plot-${look}`, `地块 · ${{ hover: "悬停", picked: "选中", blocked: "无法放置", reach: "范围" }[look]}`, "地面上的放置与范围轮廓，保留原始墨线配色。")
   d.asset.category = "construction"
   d.asset.reference = { type: "plot", look }
   d.asset.footprint = 2

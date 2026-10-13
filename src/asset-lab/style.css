@@ -1,6 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap");
 :root {
-  font-family: "DM Sans", sans-serif;
+  font-family: "DM Sans", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
   color: #3d4943;
   background: #f0f2ec;
   font-synthesis: none;
@@ -43,7 +43,7 @@ header span,
 .view-label,
 .view-foot,
 footer {
-  font-family: "DM Mono", monospace;
+  font-family: "DM Mono", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
   font-size: 10px;
   color: #748073;
 }
@@ -93,7 +93,7 @@ h1 {
   background: #f7f8f3;
   border-radius: 5px;
   padding: 12px 6px;
-  font-family: "DM Mono", monospace;
+  font-family: "DM Mono", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
   font-size: 10px;
 }
 .assets img {
@@ -206,7 +206,7 @@ h1 {
   border-radius: 4px;
   padding: 9px 12px;
   font-size: 11px;
-  font-family: "DM Mono", monospace;
+  font-family: "DM Mono", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
 }
 .controls button:hover,
 .downloads button:hover {
@@ -218,7 +218,7 @@ h1 {
   align-items: center;
   gap: 10px;
   flex: 1;
-  font-family: "DM Mono", monospace;
+  font-family: "DM Mono", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
   font-size: 11px;
 }
 .controls input {

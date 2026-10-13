@@ -295,7 +295,7 @@ export function makePerson(
   cart: CartLook | null = null,
   phase = 0
 ) {
-  const d = new Drawing(id, title, "Full 3D figure with the original coat, skin, hat and accessories. No flat character sprites.")
+  const d = new Drawing(id, title, "完整 3D 人物，保留原始外套、肤色、帽子与配件。")
   d.asset.category = cart ? "cargo" : "people"
   d.asset.reference = { type: "walker", dress, load, cart, phase }
   d.asset.footprint = 1
@@ -307,28 +307,28 @@ export function makePerson(
 export function personCatalogue() {
   const items = []
   for (const [i, hat] of ["cap", "brim", "none"].entries())
-    items.push(makePerson(`worker-${hat}`, `Carrier · ${hat}`, { ...carrierDress(0.2 + i * 0.2), hat: hat as PersonDress["hat"] }))
+    items.push(makePerson(`worker-${hat}`, `运输员 · ${{ cap: "便帽", brim: "宽檐帽", none: "无帽" }[hat as "cap" | "brim" | "none"]}`, { ...carrierDress(0.2 + i * 0.2), hat: hat as PersonDress["hat"] }))
   for (const [i, hat] of ["bonnet", "cap", "none"].entries())
     items.push(
-      makePerson(`settler-${hat}`, `Settler · ${hat}`, {
+      makePerson(`settler-${hat}`, `移民 · ${{ bonnet: "软帽", cap: "便帽", none: "无帽" }[hat as "bonnet" | "cap" | "none"]}`, {
         ...residentDress(homeVariant(i / 4 + 0.03).cloth, 1, 0.2 + i * 0.3),
         hat: hat as PersonDress["hat"]
       })
     )
-  items.push(makePerson("settler-long", "Settler · long coat", residentDress(0xb5654a, 1, 0.95)))
+  items.push(makePerson("settler-long", "移民 · 长外套", residentDress(0xb5654a, 1, 0.95)))
   for (const [i, hat] of ["top", "brim"].entries())
     items.push(
-      makePerson(`citizen-${hat}`, `Citizen · ${hat} hat`, {
+      makePerson(`citizen-${hat}`, `市民 · ${{ top: "高顶帽", brim: "宽檐帽" }[hat as "top" | "brim"]}`, {
         ...residentDress(homeVariant(i / 4 + 0.03).cloth, 2, 0.2 + i * 0.5),
         hat: hat as PersonDress["hat"]
       })
     )
   items.push(
-    makePerson("market-walker", "Market walker", serviceDress(0x3d6db5, 0.3, false), { kind: "basket", goods: ["fish", "bread", "cloth"] })
+    makePerson("market-walker", "市场配送员", serviceDress(0x3d6db5, 0.3, false), { kind: "basket", goods: ["fish", "bread", "cloth"] })
   )
-  items.push(makePerson("chapel-walker", "Chapel walker", serviceDress(0x3d6db5, 0.6, true), { kind: "bell" }))
+  items.push(makePerson("chapel-walker", "传教士", serviceDress(0x3d6db5, 0.6, true), { kind: "bell" }))
   for (const role of ["watchman", "firefighter", "physician", "constable", "builder"] as const)
-    items.push(makePerson(`service-${role}`, role[0]!.toUpperCase() + role.slice(1), serviceCostume(serviceDress(0x3d6db5, 0.3, false), role), { kind: "service", role }))
+    items.push(makePerson(`service-${role}`, { watchman: "消防巡查员", firefighter: "消防员", physician: "医师", constable: "警员", builder: "修缮工匠" }[role], serviceCostume(serviceDress(0x3d6db5, 0.3, false), role), { kind: "service", role }))
   for (let i = 0; i < 16; i++) {
     const tier = i < 8 ? 1 : 2,
       n = (i * 0.37) % 1,
@@ -336,7 +336,7 @@ export function personCatalogue() {
     items.push(
       makePerson(
         `resident-${tier}-${i % 8}`,
-        `${tier === 1 ? "Settler" : "Citizen"} · household ${(i % 8) + 1}`,
+        `${tier === 1 ? "移民" : "市民"} · 家庭 ${(i % 8) + 1}`,
         residentDress(roof.cloth, tier, n),
         { kind: "none" },
         null,
@@ -352,14 +352,14 @@ export function makeCarrier(good: GoodId | null, barrow = false, count = 4) {
   const load: Load = good ? { kind: "cart", good, count } : { kind: "none" }
   return makePerson(
     id,
-    `${barrow ? "Barrow" : "Handcart"} · ${good ? `${goods[good].title}, ${count === 1 ? "small" : "full"} load` : "empty"}`,
+    `${barrow ? "独轮车" : "手推车"} · ${good ? `${goods[good].title}，${count === 1 ? "少量" : "满载"}` : "空车"}`,
     carrierDress(barrow ? 0.2 : 0.4),
     load,
     look
   )
 }
 export function makeGoods(good: GoodId) {
-  const d = new Drawing(`goods-${good}`, goods[good].title, "Distinct cargo geometry, not a colour-swapped box.")
+  const d = new Drawing(`goods-${good}`, goods[good].title, "每种货物都有独立的几何造型。")
   d.asset.category = "cargo"
   d.asset.reference = { type: "cargo", good, count: 4 }
   d.asset.footprint = 1
@@ -367,7 +367,7 @@ export function makeGoods(good: GoodId) {
   return d.asset
 }
 export function makeCrate(good: GoodId) {
-  const d = new Drawing(`crate-${good}`, `${goods[good].title} crate`, "Cardboard crate with its original coloured label and strap.")
+  const d = new Drawing(`crate-${good}`, `${goods[good].title}货箱`, "带有原始彩色标签与绑带的货箱。")
   d.asset.category = "cargo"
   d.asset.reference = { type: "crate", good }
   d.asset.footprint = 1

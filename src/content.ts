@@ -17,18 +17,18 @@ export type GoodId = (typeof goodIds)[number]
 
 /** Each good's crate label colour (the only colour a good has), and what traders pay for one. */
 export const goods: Readonly<Record<GoodId, { readonly title: string; readonly color: number; readonly price: number }>> = {
-  wood: { title: "wood", color: 0x8a6a45, price: 1 },
-  planks: { title: "planks", color: 0xd27a34, price: 3 },
-  stone: { title: "stone", color: 0x8f9891, price: 2 },
-  ore: { title: "ore", color: 0x5a6479, price: 3 },
-  tools: { title: "tools", color: 0x3d4943, price: 10 },
-  fish: { title: "fish", color: 0x2f8c87, price: 2 },
-  smoked: { title: "smoked fish", color: 0x9a5b3a, price: 4 },
-  wheat: { title: "wheat", color: 0xd6ae2e, price: 1 },
-  flour: { title: "flour", color: 0xc9b48a, price: 2 },
-  bread: { title: "bread", color: 0xc4523f, price: 4 },
-  wool: { title: "wool", color: 0xa7ada4, price: 2 },
-  cloth: { title: "cloth", color: 0x8a58a8, price: 6 }
+  wood: { title: "原木", color: 0x8a6a45, price: 1 },
+  planks: { title: "木板", color: 0xd27a34, price: 3 },
+  stone: { title: "石料", color: 0x8f9891, price: 2 },
+  ore: { title: "矿石", color: 0x5a6479, price: 3 },
+  tools: { title: "工具", color: 0x3d4943, price: 10 },
+  fish: { title: "鲜鱼", color: 0x2f8c87, price: 2 },
+  smoked: { title: "熏鱼", color: 0x9a5b3a, price: 4 },
+  wheat: { title: "小麦", color: 0xd6ae2e, price: 1 },
+  flour: { title: "面粉", color: 0xc9b48a, price: 2 },
+  bread: { title: "面包", color: 0xc4523f, price: 4 },
+  wool: { title: "羊毛", color: 0xa7ada4, price: 2 },
+  cloth: { title: "布料", color: 0x8a58a8, price: 6 }
 }
 
 /**
@@ -156,152 +156,152 @@ const free = { residents: 0, citizens: 0 }
 // is whole), so every window and topper sits on whole units.
 export const kinds: Readonly<Record<KindId, Kind>> = {
   townhall: {
-    id: "townhall", title: "Town hall", blurb: "the heart of the town: storage, taxes, and a walker with provisions",
+    id: "townhall", title: "市政厅", blurb: "城镇的中心：储存物资、征收税款，并派出配送员供应食物",
     category: "storage", size: 3, half: 20, stories: 2, roof: "flat", bays: 2, window: 8, topper: "flag",
     cost: { coins: 0, materials: {} }, upkeep: 0, workers: 0, crew: "settlers", unlock: free, buildable: false,
     holds: { accepts: "all", cap: 100 }, carriers: 6,
     service: { service: "goods", seconds: 8, range: 20 }, appeal: { value: 4, reach: 3 }
   },
   warehouse: {
-    id: "warehouse", title: "Warehouse", blurb: "stores goods nearer where they are made and used",
+    id: "warehouse", title: "仓库", blurb: "在生产地和使用地附近储存物资",
     category: "storage", size: 3, half: 18, stories: 1, roof: "flat", bays: 3, window: 6, topper: "crates",
     cost: { coins: 150, materials: { planks: 8, stone: 4 } }, upkeep: 6, workers: 2, crew: "settlers", unlock: free, buildable: true,
     holds: { accepts: "all", cap: 50 }, carriers: 4, appeal: { value: -2, reach: 2 }
   },
   granary: {
-    id: "granary", title: "Granary", blurb: "stores food, and keeps fish and bread five times as long",
+    id: "granary", title: "粮仓", blurb: "储存食物，使鲜鱼和面包的腐坏速度降至五分之一",
     category: "storage", size: 2, half: 11, stories: 2, roof: "flat", bays: 2, window: 4, topper: "none",
     cost: { coins: 120, materials: { planks: 6, stone: 2 } }, upkeep: 4, workers: 1, crew: "settlers", unlock: { residents: 20, citizens: 0 }, buildable: true,
     holds: { accepts: ["fish", "smoked", "bread", "wheat", "flour"], cap: 60 }, carriers: 3, keeps: 5, appeal: { value: -2, reach: 2 }
   },
   lumberjack: {
-    id: "lumberjack", title: "Lumberjack", blurb: "fells grown trees nearby for wood",
+    id: "lumberjack", title: "伐木场", blurb: "砍伐附近长成的树木，获得原木",
     category: "gathering", size: 2, half: 10, stories: 1, roof: "gable", bays: 2, window: 4, topper: "none",
     cost: { coins: 50, materials: { planks: 2 } }, upkeep: 3, workers: 2, crew: "settlers", unlock: free, buildable: true,
     recipe: { input: null, inputs: 0, output: "wood", batch: 1, seconds: 6 }, gathers: { source: "tree", radius: 4 }, carriers: 2,
     wear: 60, appeal: { value: -2, reach: 2 }
   },
   forester: {
-    id: "forester", title: "Forester", blurb: "plants trees on free ground nearby",
+    id: "forester", title: "林务所", blurb: "在附近的空地上种树",
     category: "gathering", size: 2, half: 9, stories: 1, roof: "gable", bays: 2, window: 4, topper: "none",
     cost: { coins: 40, materials: { planks: 2 } }, upkeep: 2, workers: 1, crew: "settlers", unlock: free, buildable: true,
     plants: { what: "tree", radius: 3, seconds: 6, max: 20 }
   },
   quarry: {
-    id: "quarry", title: "Quarry", blurb: "cuts stone from rocks nearby",
+    id: "quarry", title: "采石场", blurb: "开采附近岩石中的石料",
     category: "gathering", size: 2, half: 10, stories: 1, roof: "flat", bays: 2, window: 6, topper: "none",
     cost: { coins: 80, materials: { planks: 4 } }, upkeep: 5, workers: 3, crew: "settlers", unlock: free, buildable: true,
     recipe: { input: null, inputs: 0, output: "stone", batch: 1, seconds: 8 }, gathers: { source: "stone", radius: 3 }, carriers: 2,
     wear: 50, dusty: true, appeal: { value: -8, reach: 4 }
   },
   mine: {
-    id: "mine", title: "Mine", blurb: "digs ore from a deposit nearby",
+    id: "mine", title: "矿场", blurb: "开采附近矿床中的矿石",
     category: "gathering", size: 2, half: 10, stories: 1, roof: "flat", bays: 2, window: 6, topper: "chimney",
     cost: { coins: 200, materials: { planks: 6, stone: 4 } }, upkeep: 10, workers: 4, crew: "settlers", unlock: { residents: 0, citizens: 10 }, buildable: true,
     recipe: { input: null, inputs: 0, output: "ore", batch: 1, seconds: 10 }, gathers: { source: "ore", radius: 3 }, carriers: 2,
     wear: 50, dusty: true, appeal: { value: -8, reach: 4 }
   },
   fishery: {
-    id: "fishery", title: "Fishery", blurb: "catches fish; needs water within two cells",
+    id: "fishery", title: "渔场", blurb: "捕鱼；两格以内必须有水域",
     category: "food", size: 2, half: 10, stories: 1, roof: "gable", bays: 2, window: 4, topper: "none",
     cost: { coins: 60, materials: { planks: 3 } }, upkeep: 3, workers: 2, crew: "settlers", unlock: free, buildable: true,
     recipe: { input: null, inputs: 0, output: "fish", batch: 1, seconds: 4 }, gathers: { source: "water", radius: 2 }, carriers: 2,
     appeal: { value: -2, reach: 2 }
   },
   smokehouse: {
-    id: "smokehouse", title: "Smokehouse", blurb: "smokes fish, which then keeps all winter",
+    id: "smokehouse", title: "熏鱼坊", blurb: "将鲜鱼熏制，使其能储存一整个冬季",
     category: "food", size: 2, half: 10, stories: 1, roof: "gable", bays: 2, window: 4, topper: "chimney",
     cost: { coins: 90, materials: { planks: 4, stone: 1 } }, upkeep: 4, workers: 2, crew: "settlers", unlock: { residents: 20, citizens: 0 }, buildable: true,
     recipe: { input: "fish", inputs: 1, output: "smoked", batch: 1, seconds: 5 }, holds: { accepts: ["fish", "smoked"], cap: 8 }, carriers: 2,
     wear: 60, hot: true, appeal: { value: -4, reach: 3 }
   },
   sawmill: {
-    id: "sawmill", title: "Sawmill", blurb: "saws wood into planks",
+    id: "sawmill", title: "锯木厂", blurb: "将原木锯成木板",
     category: "crafts", size: 2, half: 12, stories: 1, roof: "flat", bays: 2, window: 6, topper: "chimney",
     cost: { coins: 100, materials: { planks: 2, stone: 2 } }, upkeep: 6, workers: 2, crew: "citizens", unlock: free, buildable: true,
     recipe: { input: "wood", inputs: 1, output: "planks", batch: 1, seconds: 5 }, holds: { accepts: ["wood", "planks"], cap: 8 }, carriers: 2,
     wear: 60, appeal: { value: -4, reach: 3 }
   },
   smithy: {
-    id: "smithy", title: "Smithy", blurb: "forges ore into tools",
+    id: "smithy", title: "铁匠铺", blurb: "将矿石锻造成工具",
     category: "crafts", size: 2, half: 12, stories: 1, roof: "flat", bays: 2, window: 6, topper: "chimney",
     cost: { coins: 250, materials: { planks: 4, stone: 6 } }, upkeep: 12, workers: 3, crew: "citizens", unlock: { residents: 0, citizens: 10 }, buildable: true,
     recipe: { input: "ore", inputs: 1, output: "tools", batch: 1, seconds: 10 }, holds: { accepts: ["ore", "tools"], cap: 8 }, carriers: 2,
     hot: true, appeal: { value: -8, reach: 4 }
   },
   farm: {
-    id: "farm", title: "Farm", blurb: "sows fields around it and harvests the wheat",
+    id: "farm", title: "农场", blurb: "在周围播种农田，收获小麦",
     category: "food", size: 3, half: 12, stories: 1, roof: "gable", bays: 2, window: 4, topper: "none",
     cost: { coins: 120, materials: { planks: 4 } }, upkeep: 5, workers: 2, crew: "settlers", unlock: { residents: 30, citizens: 0 }, buildable: true,
     recipe: { input: null, inputs: 0, output: "wheat", batch: 1, seconds: 4 }, gathers: { source: "field", radius: 2 },
     plants: { what: "field", radius: 2, seconds: 3, max: 8 }, carriers: 2, appeal: { value: -2, reach: 2 }
   },
   mill: {
-    id: "mill", title: "Mill", blurb: "grinds wheat into flour",
+    id: "mill", title: "磨坊", blurb: "将小麦磨成面粉",
     category: "food", size: 2, half: 8, stories: 2, roof: "flat", bays: 2, window: 4, topper: "sails",
     cost: { coins: 150, materials: { planks: 6, stone: 2, tools: 1 } }, upkeep: 8, workers: 2, crew: "citizens", unlock: { residents: 30, citizens: 0 }, buildable: true,
     recipe: { input: "wheat", inputs: 1, output: "flour", batch: 1, seconds: 6 }, holds: { accepts: ["wheat", "flour"], cap: 8 }, carriers: 2,
     wear: 60, appeal: { value: -4, reach: 3 }
   },
   bakery: {
-    id: "bakery", title: "Bakery", blurb: "bakes flour into bread",
+    id: "bakery", title: "面包坊", blurb: "将面粉烤成面包",
     category: "food", size: 2, half: 12, stories: 1, roof: "flat", bays: 2, window: 6, topper: "chimney",
     cost: { coins: 150, materials: { planks: 4, stone: 4, tools: 1 } }, upkeep: 8, workers: 2, crew: "citizens", unlock: { residents: 30, citizens: 0 }, buildable: true,
     recipe: { input: "flour", inputs: 1, output: "bread", batch: 2, seconds: 6 }, holds: { accepts: ["flour", "bread"], cap: 8 }, carriers: 2,
     wear: 60, hot: true, appeal: { value: -4, reach: 3 }
   },
   sheep: {
-    id: "sheep", title: "Sheep farm", blurb: "shears sheep for wool",
+    id: "sheep", title: "牧羊场", blurb: "剪取羊毛",
     category: "crafts", size: 3, half: 12, stories: 1, roof: "gable", bays: 2, window: 4, topper: "none",
     cost: { coins: 100, materials: { planks: 4 } }, upkeep: 5, workers: 2, crew: "settlers", unlock: { residents: 15, citizens: 0 }, buildable: true,
     recipe: { input: null, inputs: 0, output: "wool", batch: 1, seconds: 6 }, carriers: 2, appeal: { value: -2, reach: 2 }
   },
   weaver: {
-    id: "weaver", title: "Weaver", blurb: "weaves wool into cloth",
+    id: "weaver", title: "织布坊", blurb: "将羊毛织成布料",
     category: "crafts", size: 2, half: 12, stories: 1, roof: "flat", bays: 2, window: 6, topper: "none",
     cost: { coins: 150, materials: { planks: 4, stone: 2, tools: 1 } }, upkeep: 8, workers: 2, crew: "citizens", unlock: { residents: 15, citizens: 0 }, buildable: true,
     recipe: { input: "wool", inputs: 1, output: "cloth", batch: 1, seconds: 6 }, holds: { accepts: ["wool", "cloth"], cap: 8 }, carriers: 2,
     wear: 60, appeal: { value: -2, reach: 2 }
   },
   market: {
-    id: "market", title: "Market", blurb: "a walker carries fish, bread, and cloth to the homes it passes",
+    id: "market", title: "市场", blurb: "配送员向沿途住宅供应鲜鱼、熏鱼、面包和布料",
     category: "services", size: 2, half: 12, stories: 1, roof: "flat", bays: 2, window: 6, topper: "flag",
     cost: { coins: 120, materials: { planks: 6, stone: 2 } }, upkeep: 6, workers: 2, crew: "citizens", unlock: free, buildable: true,
     holds: { accepts: ["fish", "smoked", "bread", "cloth"], cap: 12 },
     service: { service: "goods", seconds: 6, range: 18 }, appeal: { value: 2, reach: 3 }
   },
   chapel: {
-    id: "chapel", title: "Chapel", blurb: "a walker brings faith to the homes it passes",
+    id: "chapel", title: "教堂", blurb: "传教士为沿途住宅提供信仰服务",
     category: "services", size: 2, half: 12, stories: 2, roof: "flat", bays: 2, window: 6, topper: "cupola",
     cost: { coins: 200, materials: { planks: 6, stone: 6 } }, upkeep: 10, workers: 1, crew: "citizens", unlock: { residents: 15, citizens: 0 }, buildable: true,
     service: { service: "faith", seconds: 8, range: 22 }, appeal: { value: 4, reach: 3 }
   },
   firewatch: {
-    id: "firewatch", title: "Fire watch", blurb: "a watchman checks homes and workshops along the way for fire; firefighters run to any blaze",
+    id: "firewatch", title: "消防站", blurb: "巡查员降低沿途住宅与工坊的火灾风险，消防员赶赴火场灭火",
     category: "services", size: 2, half: 9, stories: 1, roof: "gable", bays: 2, window: 4, topper: "none",
     cost: { coins: 70, materials: { planks: 3 } }, upkeep: 3, workers: 2, crew: "settlers", unlock: free, buildable: true,
     service: { service: "fire", seconds: 7, range: 30 }
   },
   healer: {
-    id: "healer", title: "Healer", blurb: "a physician calls on the homes along the way and cures the sick",
+    id: "healer", title: "医馆", blurb: "医师巡视沿途住宅，治疗病人",
     category: "services", size: 2, half: 10, stories: 1, roof: "flat", bays: 2, window: 4, topper: "none",
     cost: { coins: 110, materials: { planks: 4, stone: 2 } }, upkeep: 4, workers: 1, crew: "citizens", unlock: { residents: 30, citizens: 0 }, buildable: true,
     service: { service: "health", seconds: 8, range: 30 }, appeal: { value: 1, reach: 2 }
   },
   hospital: {
-    id: "hospital", title: "Hospital", blurb: "physicians call more often and walk further",
+    id: "hospital", title: "医院", blurb: "医师巡视更频繁，服务范围更大",
     category: "services", size: 3, half: 16, stories: 2, roof: "flat", bays: 2, window: 6, topper: "cupola",
     cost: { coins: 400, materials: { planks: 10, stone: 10, tools: 2 } }, upkeep: 16, workers: 4, crew: "citizens", unlock: { residents: 0, citizens: 40 }, buildable: true,
     service: { service: "health", seconds: 4, range: 40 }, appeal: { value: 2, reach: 3 }
   },
   watchhouse: {
-    id: "watchhouse", title: "Watch house", blurb: "a constable walks the streets, keeping order in the homes along the way",
+    id: "watchhouse", title: "治安所", blurb: "警员沿街巡逻，维护沿途住宅的治安",
     category: "services", size: 2, half: 10, stories: 1, roof: "flat", bays: 2, window: 4, topper: "flag",
     cost: { coins: 100, materials: { planks: 4, stone: 2 } }, upkeep: 3, workers: 2, crew: "settlers", unlock: { residents: 40, citizens: 0 }, buildable: true,
     service: { service: "order", seconds: 8, range: 30 }
   },
   builder: {
-    id: "builder", title: "Builder's yard", blurb: "a builder mends the homes and buildings along the way, with planks and stone",
+    id: "builder", title: "修缮工坊", blurb: "工匠使用木板和石料修缮沿途的住宅与建筑",
     category: "services", size: 2, half: 10, stories: 1, roof: "gable", bays: 2, window: 4, topper: "none",
     cost: { coins: 90, materials: { planks: 4 } }, upkeep: 3, workers: 2, crew: "settlers", unlock: free, buildable: true,
     holds: { accepts: ["planks", "stone"], cap: 6 },
@@ -315,7 +315,7 @@ export const kindOrder: ReadonlyArray<KindId> = [
 ]
 
 export const costText = (cost: Kind["cost"]): string =>
-  [cost.coins > 0 ? `${cost.coins} coins` : "", ...Object.entries(cost.materials).map(([g, n]) => `${n} ${g}`)].filter((s) => s !== "").join(" · ")
+  [cost.coins > 0 ? `${cost.coins} 金币` : "", ...Object.entries(cost.materials).map(([g, n]) => `${n} ${goods[g as GoodId].title}`)].filter((s) => s !== "").join(" · ")
 
 // ── Parks ─────────────────────────────────────────────────────────────────
 
@@ -347,16 +347,16 @@ export interface ParkPiece {
 }
 
 export const grounds: Readonly<Record<GroundId, ParkPiece>> = {
-  lawn: { title: "Lawn", blurb: "grass to lay a park out on", cost: { coins: 2, materials: {} }, upkeep: 0.05, beauty: 0.25, unlock: free },
-  flowers: { title: "Flower bed", blurb: "planted borders: prettier than lawn", cost: { coins: 5, materials: {} }, upkeep: 0.15, beauty: 0.75, unlock: free },
-  path: { title: "Gravel path", blurb: "a walk through the park", cost: { coins: 3, materials: {} }, upkeep: 0.05, beauty: 0.25, unlock: free },
-  square: { title: "Paved square", blurb: "stone setts, for a statue or a fountain to stand on", cost: { coins: 3, materials: { stone: 1 } }, upkeep: 0.05, beauty: 0.25, unlock: free }
+  lawn: { title: "草坪", blurb: "铺设公园的草地", cost: { coins: 2, materials: {} }, upkeep: 0.05, beauty: 0.25, unlock: free },
+  flowers: { title: "花坛", blurb: "种满花卉，比草坪更美观", cost: { coins: 5, materials: {} }, upkeep: 0.15, beauty: 0.75, unlock: free },
+  path: { title: "碎石小径", blurb: "穿过公园的小径", cost: { coins: 3, materials: {} }, upkeep: 0.05, beauty: 0.25, unlock: free },
+  square: { title: "石铺广场", blurb: "石块铺成的广场，可摆放雕像或喷泉", cost: { coins: 3, materials: { stone: 1 } }, upkeep: 0.05, beauty: 0.25, unlock: free }
 }
 
 export const props: Readonly<Record<PropId, ParkPiece>> = {
-  lamp: { title: "Lamp", blurb: "an iron lamp post along the walk", cost: { coins: 12, materials: { tools: 1 } }, upkeep: 0.2, beauty: 1.5, unlock: free },
-  fountain: { title: "Fountain", blurb: "a stone basin of fresh water", cost: { coins: 70, materials: { stone: 3 } }, upkeep: 2, beauty: 4, unlock: { residents: 30, citizens: 0 } },
-  statue: { title: "Statue", blurb: "a founder in stone, the pride of the park", cost: { coins: 160, materials: { stone: 6 } }, upkeep: 3, beauty: 5, unlock: { residents: 0, citizens: 20 } }
+  lamp: { title: "路灯", blurb: "小径旁的铁制路灯", cost: { coins: 12, materials: { tools: 1 } }, upkeep: 0.2, beauty: 1.5, unlock: free },
+  fountain: { title: "喷泉", blurb: "盛着清水的石制喷泉", cost: { coins: 70, materials: { stone: 3 } }, upkeep: 2, beauty: 4, unlock: { residents: 30, citizens: 0 } },
+  statue: { title: "雕像", blurb: "城镇奠基者的石像，公园的骄傲", cost: { coins: 160, materials: { stone: 6 } }, upkeep: 3, beauty: 5, unlock: { residents: 0, citizens: 20 } }
 }
 
 /** How a park's beauty adds up (see `parkSources`). */
@@ -388,9 +388,9 @@ export const home = {
   half: 5,
   cost: { coins: 10, materials: { planks: 1 } } as Kind["cost"],
   tiers: {
-    1: { title: "settlers", residents: 4, tax: 2.5, height: 14, needs: ["food"], appeal: -100 },
-    2: { title: "citizens", residents: 8, tax: 5, height: 26, needs: ["bread", "cloth", "faith"], appeal: 5 },
-    3: { title: "burghers", residents: 12, tax: 6.5, height: 38, needs: ["bread", "cloth", "faith"], appeal: 15 }
+    1: { title: "移民", residents: 4, tax: 2.5, height: 14, needs: ["food"], appeal: -100 },
+    2: { title: "市民", residents: 8, tax: 5, height: 26, needs: ["bread", "cloth", "faith"], appeal: 5 },
+    3: { title: "富裕市民", residents: 12, tax: 6.5, height: 38, needs: ["bread", "cloth", "faith"], appeal: 15 }
   } as Readonly<Record<Tier, {
     readonly title: string
     readonly residents: number
@@ -419,7 +419,7 @@ export const home = {
 }
 
 /** What a tier's homes are called, and what its residents are. */
-export const tierHome: Readonly<Record<Tier, string>> = { 1: "settlers' cottage", 2: "citizens' home", 3: "townhouse" }
+export const tierHome: Readonly<Record<Tier, string>> = { 1: "移民小屋", 2: "市民住宅", 3: "市民宅邸" }
 
 /** Which crew a tier's residents work in. */
 export const crewOf = (tier: Tier): Crew => (tier === 1 ? "settlers" : "citizens")
@@ -543,7 +543,7 @@ export const condition = {
 /** Tax rates the town can set, in percent of the usual. */
 export const TAX_STEPS = [50, 75, 100, 125, 150, 200] as const
 
-export const needTitle: Readonly<Record<Need, string>> = { food: "food", bread: "bread", cloth: "cloth", faith: "faith" }
+export const needTitle: Readonly<Record<Need, string>> = { food: "食物", bread: "面包", cloth: "布料", faith: "信仰" }
 
 // ── The town ──────────────────────────────────────────────────────────────
 
@@ -576,9 +576,9 @@ export const sizes: Readonly<Record<SizeId, {
   readonly radius: number
   readonly goal: { readonly residents: number; readonly coins: number }
 }>> = {
-  small: { title: "small", radius: 14, goal: { residents: 180, coins: 2500 } },
-  medium: { title: "medium", radius: 19, goal: { residents: 320, coins: 4000 } },
-  large: { title: "large", radius: 25, goal: { residents: 520, coins: 5000 } }
+  small: { title: "小型", radius: 14, goal: { residents: 180, coins: 2500 } },
+  medium: { title: "中型", radius: 19, goal: { residents: 320, coins: 4000 } },
+  large: { title: "大型", radius: 25, goal: { residents: 520, coins: 5000 } }
 }
 
 /**
@@ -598,17 +598,17 @@ export const lands: Readonly<Record<LandId, {
   readonly stock: Amounts
 }>> = {
   rich: {
-    title: "rich", blurb: "deep forests, plenty of stone and ore, two lakes, a full treasury",
+    title: "富饶", blurb: "茂密森林、充足石料与矿石、两片湖泊，以及充裕的启动资金",
     forests: 7, stone: 4.5, ore: 3, rock: 40, lakes: 2, coins: 2400,
     stock: amounts({ wood: 15, planks: 50, stone: 24, tools: 10, fish: 30 })
   },
   fair: {
-    title: "fair", blurb: "enough of everything, if it is not wasted",
+    title: "适中", blurb: "各类资源足够使用，前提是避免浪费",
     forests: 5.5, stone: 3, ore: 2, rock: 32, lakes: 2, coins: 1900,
     stock: amounts({ wood: 10, planks: 40, stone: 16, tools: 10, fish: 20 })
   },
   harsh: {
-    title: "harsh", blurb: "thin woods, little stone, one deposit of ore, one lake",
+    title: "贫瘠", blurb: "稀疏森林、少量石料、一处矿床和一片湖泊",
     forests: 4, stone: 2, ore: 1, rock: 24, lakes: 1, coins: 1500,
     stock: amounts({ wood: 10, planks: 30, stone: 12, tools: 8, fish: 15 })
   }
@@ -640,9 +640,9 @@ export const WINTER_SHARE = 0.3
 export const winterIds = ["mild", "normal", "hard"] as const
 export type WinterId = (typeof winterIds)[number]
 export const winters: Readonly<Record<WinterId, { readonly title: string; readonly share: number; readonly fishing: number; readonly heating: boolean; readonly chance: number }>> = {
-  mild: { title: "mild", share: WINTER_SHARE, fishing: 0.75, heating: false, chance: 0.3 },
-  normal: { title: "normal", share: WINTER_SHARE, fishing: 0.5, heating: false, chance: 0.45 },
-  hard: { title: "hard", share: WINTER_SHARE * 1.5, fishing: 0.4, heating: true, chance: 0.25 }
+  mild: { title: "暖冬", share: WINTER_SHARE, fishing: 0.75, heating: false, chance: 0.3 },
+  normal: { title: "普通冬季", share: WINTER_SHARE, fishing: 0.5, heating: false, chance: 0.45 },
+  hard: { title: "严冬", share: WINTER_SHARE * 1.5, fishing: 0.4, heating: true, chance: 0.25 }
 }
 /** The almanac warns of winter this many steps before it comes. */
 export const WINTER_WARNING = ticks(60)

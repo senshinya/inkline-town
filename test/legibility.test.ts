@@ -22,28 +22,28 @@ import { headless } from "../src/sim/headless.ts"
 const settlers = { tier: 1 as const, residents: 4, food: 100, bread: 100, cloth: 0, faith: 100, clock: 0 }
 const plenty: InTown = { fish: 20, smoked: 0, bread: 30, cloth: 188 }
 const served: Served = { goods: true, faith: true }
-const quarryStreet: Street = { desirability: -4, parts: [{ label: "quarry", value: -6 }, { label: "chapel", value: 2 }] }
+const quarryStreet: Street = { desirability: -4, parts: [{ label: "采石场", value: -6 }, { label: "教堂", value: 2 }] }
 
 test("cloth withheld from a poor street is told as the street, not as missing cloth", () => {
   const why = whyUnmet("cloth", settlers, quarryStreet, plenty, served)
   assert.ok(why, "an unmet need has a reason")
-  assert.match(why, /not brought here/)
-  assert.match(why, /needs 5/)
-  assert.match(why, /quarry −6/)
+  assert.match(why, /不配送布料/)
+  assert.match(why, /需要 5/)
+  assert.match(why, /采石场 −6/)
   const all = blockers(settlers, quarryStreet, plenty, served, { fire: 0, health: 0, order: 0 })
   assert.deepEqual(all.map((b) => b.what), ["cloth", "street"])
-  assert.match(all[1]!.text, /move industry away|park/)
+  assert.match(all[1]!.text, /移走附近工业建筑|公园/)
 })
 
 test("on a street fit for citizens the reason moves to the walker or the store", () => {
-  const fine: Street = { desirability: 6, parts: [{ label: "chapel", value: 4 }, { label: "market", value: 2 }] }
-  assert.match(whyUnmet("cloth", settlers, fine, plenty, served)!, /walker has not passed with cloth/)
-  assert.match(whyUnmet("cloth", settlers, fine, { ...plenty, cloth: 0 }, served)!, /no cloth: a weaver/)
-  assert.match(whyUnmet("cloth", settlers, fine, plenty, { goods: false, faith: true })!, new RegExp(`${kinds.market.service!.range} road cells`))
+  const fine: Street = { desirability: 6, parts: [{ label: "教堂", value: 4 }, { label: "市场", value: 2 }] }
+  assert.match(whyUnmet("cloth", settlers, fine, plenty, served)!, /配送员近期未携带布料经过/)
+  assert.match(whyUnmet("cloth", settlers, fine, { ...plenty, cloth: 0 }, served)!, /没有布料：织布坊/)
+  assert.match(whyUnmet("cloth", settlers, fine, plenty, { goods: false, faith: true })!, new RegExp(`${kinds.market.service!.range} 格道路`))
   assert.equal(whyUnmet("faith", settlers, fine, plenty, served), null)
-  assert.match(whyUnmet("faith", { ...settlers, faith: 0 }, fine, plenty, { goods: true, faith: false })!, /no chapel walker/)
-  assert.match(whyUnmet("food", { ...settlers, food: 0 }, fine, { fish: 0, smoked: 0, bread: 0, cloth: 0 }, served)!, /no food in store/)
-  assert.equal(streetShort(quarryStreet, 5), "−4 here, 5 needed: quarry −6")
+  assert.match(whyUnmet("faith", { ...settlers, faith: 0 }, fine, plenty, { goods: true, faith: false })!, /传教士无法到达/)
+  assert.match(whyUnmet("food", { ...settlers, food: 0 }, fine, { fish: 0, smoked: 0, bread: 0, cloth: 0 }, served)!, /没有食物库存/)
+  assert.equal(streetShort(quarryStreet, 5), "当前 −4，需要 5：采石场 −6")
 })
 
 test("desirability counts point by point: a cottage beside a quarry empties a little and pays less", () => {
@@ -109,10 +109,10 @@ test("a real town: cottages beside a quarry are told why they will not grow", { 
   const worst = cottages.map((e) => appealAt(cells, e.components["Town/Tile"].x, e.components["Town/Tile"].y)).sort((a, b) => a - b)[0]!
   assert.ok(worst < 0, `a cottage beside a quarry is on a poor street (${worst})`)
   const house = cottages[0]!.components["Town/House"]
-  const street: Street = { desirability: worst, parts: [{ label: "quarry", value: worst }] }
+  const street: Street = { desirability: worst, parts: [{ label: "采石场", value: worst }] }
   const why = blockers({ ...house, bread: 1, faith: 1, cloth: 0 }, street, plenty, served, undefined)
-  assert.ok(why.some((b) => b.what === "cloth" && /needs 5/.test(b.text)), "cloth is explained by the street")
-  assert.ok(why.some((b) => b.what === "street" && /quarry/.test(b.text)), "the street names the quarry")
+  assert.ok(why.some((b) => b.what === "cloth" && /需要 5/.test(b.text)), "cloth is explained by the street")
+  assert.ok(why.some((b) => b.what === "street" && /采石场/.test(b.text)), "the street names the quarry")
   // And the rules bite at once: the street holds fewer than a plain one would.
   assert.ok(capacity(house, s.resources["Town/Mood"].approval, worst) < capacity(house, s.resources["Town/Mood"].approval, 0) || worst > -3, "a street below −2 holds fewer")
   // A workplace with nobody in reach says so in the same breath.

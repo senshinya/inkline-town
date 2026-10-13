@@ -89,31 +89,31 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
   const stock = el("div", "card stock")
   /** What each good is for, for the stock bar's tooltips: who makes it, who takes it. */
   const goodHelp: Readonly<Record<GoodId, string>> = {
-    wood: "lumberjacks fell it; a sawmill saws it into planks",
-    planks: "what homes and buildings are built from: a sawmill makes them from wood",
-    stone: "for building and paving: quarries cut it from rocks, which run out",
-    ore: "mines dig it; a smithy forges it into tools",
-    tools: "for building, and workshops wear one out every 50 or 60 jobs: a smithy forges them, or buy them",
-    fish: "food for settlers: fisheries catch it by the water; it rots in about three minutes",
-    smoked: "fish that keeps all winter: a smokehouse smokes it",
-    wheat: "farms grow it; a mill grinds it into flour (not in winter)",
-    flour: "a mill's; a bakery bakes it into bread",
-    bread: "food that citizens need, and a cottage with bread pays half again: it rots in about five minutes",
-    wool: "sheep farms shear it; a weaver weaves it into cloth",
-    cloth: "citizens need it: only brought to streets with desirability 5 or more"
+    wood: "伐木场砍伐树木；锯木厂将原木加工成木板",
+    planks: "住宅和建筑的建材：锯木厂将原木加工成木板",
+    stone: "用于建筑和铺路：采石场从有限的岩石中开采",
+    ore: "矿场开采矿石；铁匠铺将其锻造成工具",
+    tools: "用于建筑；工坊每工作50或60次消耗一件，可由铁匠铺生产或购买",
+    fish: "移民的食物：渔场在水边捕鱼；储存期间会逐渐腐坏",
+    smoked: "能储存一整个冬季的鱼：由熏鱼坊制作",
+    wheat: "农场种植小麦；磨坊将其磨成面粉（冬季停止种植）",
+    flour: "由磨坊生产；面包坊将其烤成面包",
+    bread: "市民所需的食物；供应面包的移民小屋税收增加50%；会逐渐腐坏，但比鲜鱼耐储存",
+    wool: "牧羊场剪取羊毛；织布坊将其织成布料",
+    cloth: "市民需要布料；仅向宜居度达到5的街区配送"
   }
   const groups: ReadonlyArray<ReadonlyArray<GoodId>> = [
     ["wood", "planks", "stone", "ore", "tools"],
     ["fish", "smoked", "wheat", "flour", "bread"],
     ["wool", "cloth"]
   ]
-  stock.title = "Goods in the town's storage · hover one for what it is for"
+  stock.title = "城镇库存 · 将鼠标悬停在物资上查看用途"
   const goodCells = new Map<GoodId, HTMLElement>()
   for (const group of groups) {
     const cell = el("div", "group")
     for (const g of group) {
       const item = el("span", "good")
-      item.title = `${goods[g].title}: ${goodHelp[g]}`
+      item.title = `${goods[g].title}：${goodHelp[g]}`
       item.setAttribute("aria-label", goods[g].title)
       const glyph = el("span", "glyph")
       glyph.innerHTML = goodIcon(g, 18)
@@ -127,7 +127,7 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
   // The crown's request, when there is one, and what threatens (or is about to complete) the term.
   const request = el("div", "card request")
   const requestText = el("div", "cell")
-  const send = el("button", "send", "send")
+  const send = el("button", "send", "交付")
   send.onclick = (event) => {
     event.stopPropagation()
     ui.edits.push({ type: "deliver" })
@@ -145,7 +145,7 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
   const jobs = el("div", "cell jobs")
   folk.append(approval, settlerCell, citizenCell, jobs)
   people.append(folk)
-  people.title = "Open the town's numbers, goals, and levers (T)"
+  people.title = "打开城镇统计、目标和政策面板（T）"
   people.onclick = () => toggleMenu("town")
   /** Points the page at a place: the camera goes there, it is outlined for a moment, and (when it is a thing) it is selected. */
   const goTo = (at: { readonly x: number; readonly y: number }, size: number, id: number | null) => {
@@ -223,27 +223,27 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
   }> = [
     {
       tool: "select",
-      label: "select",
+      label: "选择",
       key: "S",
       icon: "select",
-      tip: "Click a building or home to see what it does · drag to pan · wheel to zoom"
+      tip: "点击建筑或住宅查看详情 · 拖动平移 · 滚轮缩放"
     },
-    { tool: "road", label: "road", key: "R", icon: "road", tip: `Drag to lay a road · ${ROAD_COST} coins a cell` },
+    { tool: "road", label: "道路", key: "R", icon: "road", tip: `拖动铺设道路 · 每格 ${ROAD_COST} 金币` },
     {
       tool: "pave",
-      label: "pave",
+      label: "铺石",
       key: "P",
       icon: "pave",
-      tip: `Drag along a road to pave it: carriers and walkers go ${PAVED_PACE}× as fast on it, and homes beside it like it · ${PAVE_COST.coins} coins and ${PAVE_COST.stone} stone a cell`
+      tip: `沿道路拖动铺石：运输员和服务人员的速度提升至 ${PAVED_PACE} 倍，并提高沿街宜居度 · 每格 ${PAVE_COST.coins} 金币和 ${PAVE_COST.stone} 石料`
     },
-    { tool: "home", label: "homes", key: "H", icon: "homes", tip: `Drag to lay a row of homes along a road · ${costText(home.cost)} each` },
-    { tool: "build", label: "build", key: "B", icon: "build", tip: "Choose a building, then click to place it · Esc to stop" },
-    { tool: "bulldoze", label: "bulldoze", key: "X", icon: "bulldoze", tip: "Click a building, home, road, tree, or field to remove it" }
+    { tool: "home", label: "住宅", key: "H", icon: "homes", tip: `拖动沿道路建造住宅 · 每栋 ${costText(home.cost)}` },
+    { tool: "build", label: "建造", key: "B", icon: "build", tip: "选择建筑，再点击放置 · Esc 取消" },
+    { tool: "bulldoze", label: "拆除", key: "X", icon: "bulldoze", tip: "点击拆除建筑、住宅、道路、树木或农田" }
   ]
   // The town's panel is opened most: it has a button of its own, first and larger.
   const townButton = el("button", "town-button")
-  townButton.title = "The town's goals, numbers, taxes, and trade (T)"
-  townButton.append(iconEl("town", 22), el("span", "", "town"), el("kbd", "", "T"))
+  townButton.title = "城镇目标、统计、税率和贸易（T）"
+  townButton.append(iconEl("town", 22), el("span", "", "城镇"), el("kbd", "", "T"))
   townButton.onclick = () => toggleMenu("town")
   const toolGroup = el("div", "group")
   toolbar.append(townButton, toolGroup)
@@ -265,7 +265,7 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
   ].map(({ speed, label, key }) => {
     const button = el("button", speed === 0 ? "pause" : "", label)
     if (speed === 0) button.append(iconEl("pause", 14))
-    button.title = speed === 0 ? "Pause the town (space)" : `Run the town at ${label} (${key})`
+    button.title = speed === 0 ? "暂停游戏（空格）" : `以 ${label} 速度运行（${key}）`
     button.onclick = () => setSpeed(speed)
     speedGroup.append(button)
     return { speed, button }
@@ -280,17 +280,17 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
 
   // ── Map views ──
   const viewButtons: ReadonlyArray<{ readonly view: Exclude<View, "none">; readonly label: string; readonly key: string; readonly icon: IconName }> = [
-    { view: "appeal", label: "desirability", key: "D", icon: "appeal" },
-    { view: "workers", label: "workers", key: "W", icon: "workers" },
-    { view: "fire", label: "fire", key: "F", icon: "fire" },
-    { view: "health", label: "health", key: "A", icon: "health" },
-    { view: "order", label: "order", key: "O", icon: "order" },
-    { view: "condition", label: "condition", key: "C", icon: "condition" }
+    { view: "appeal", label: "宜居度", key: "D", icon: "appeal" },
+    { view: "workers", label: "劳动力", key: "W", icon: "workers" },
+    { view: "fire", label: "火灾", key: "F", icon: "fire" },
+    { view: "health", label: "健康", key: "A", icon: "health" },
+    { view: "order", label: "治安", key: "O", icon: "order" },
+    { view: "condition", label: "建筑状况", key: "C", icon: "condition" }
   ]
   views.append(iconEl("view", 16))
   const viewEls = viewButtons.map((v) => {
     const button = el("button", "")
-    button.title = `Show ${v.label} over the map (${v.key}); again to hide it`
+    button.title = `在地图上显示${v.label}（${v.key}）；再次点击隐藏`
     button.append(iconEl(v.icon, 15), document.createTextNode(v.label), el("kbd", "", v.key))
     button.onclick = () => setView(ui.view === v.view ? "none" : v.view)
     views.append(button)
@@ -309,16 +309,16 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     button.onclick = run
     system.append(button)
   }
-  action("save", "save", "Save the town in this browser (it also autosaves every two minutes)", () =>
-    ui.toast(persistence().save() ?? "Saved")
+  action("save", "保存", "将城镇保存到此浏览器（每两分钟自动保存）", () =>
+    ui.toast(persistence().save() ?? "已保存")
   )
-  action("load", "load", "Load the latest save: yours or the autosave, whichever is newer", () =>
-    confirmLeave("load the latest save?", "The town as it is now is replaced by the latest save (yours or the autosave).", "Load", () =>
-      ui.toast(persistence().load() ?? "Loaded")
+  action("load", "读取", "读取最新的手动或自动存档", () =>
+    confirmLeave("读取最新存档？", "当前城镇将被最新的手动或自动存档替换。", "读取", () =>
+      ui.toast(persistence().load() ?? "已读取")
     )
   )
-  action("newTown", "new town", "Found a new town on new land", () =>
-    confirmLeave("found a new town?", "This town is left behind for good unless it is saved first.", "Choose new land", () =>
+  action("newTown", "新城镇", "在新地图上建立城镇", () =>
+    confirmLeave("建立新城镇？", "除非先保存，否则当前城镇将永久丢失。", "选择新地图", () =>
       openCharter(true)
     )
   )
@@ -335,16 +335,16 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
       confirmBox.classList.remove("open")
       if (resume) setSpeed(wasSpeed)
     }
-    const stay = el("button", "frame primary", "Keep playing")
+    const stay = el("button", "frame primary", "继续游戏")
     stay.onclick = () => close(true)
-    const saveFirst = el("button", "frame", `Save, then ${go.toLowerCase()}`)
+    const saveFirst = el("button", "frame", `保存后${go.toLowerCase()}`)
     saveFirst.onclick = () => {
       const failed = persistence().save()
       if (failed) return ui.toast(failed)
       close(true)
       run()
     }
-    const leave = el("button", "frame danger", `${go} without saving`)
+    const leave = el("button", "frame danger", `不保存，直接${go}`)
     leave.onclick = () => {
       close(true)
       run()
@@ -379,19 +379,19 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     ui.placing = kind
     ui.menu = null
     choose("place")
-    ui.toast(`Click to place a ${kinds[kind].title.toLowerCase()} · Esc to stop`)
+    ui.toast(`点击放置${kinds[kind].title.toLowerCase()} · Esc 取消`)
   }
   const layGround = (ground: GroundId) => {
     ui.ground = ground
     ui.menu = null
     choose("ground")
-    ui.toast(`Drag a rectangle to lay ${grounds[ground].title.toLowerCase()} · Esc to stop`)
+    ui.toast(`拖出矩形铺设${grounds[ground].title.toLowerCase()} · Esc 取消`)
   }
   const furnish = (prop: PropId) => {
     ui.prop = prop
     ui.menu = null
     choose("prop")
-    ui.toast(`Click a cell of park to set a ${props[prop].title.toLowerCase()} · Esc to stop`)
+    ui.toast(`点击公园格子摆放${props[prop].title.toLowerCase()} · Esc 取消`)
   }
   choose("select")
 
@@ -510,7 +510,7 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     text.append(el("h2", "", title))
     if (below) text.append(below)
     const closeButton = el("button", "close")
-    closeButton.title = "Close (Esc)"
+    closeButton.title = "关闭（Esc）"
     closeButton.append(iconEl("close", 18))
     closeButton.onclick = () => {
       ui.selected = null
@@ -525,8 +525,8 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     const s = ui.stats
     if (!s) return null
     const residents = s.settlers + s.citizens
-    if (residents < kind.unlock.residents) return `needs ${kind.unlock.residents} residents`
-    if (s.citizens < kind.unlock.citizens) return `needs ${kind.unlock.citizens} citizens`
+    if (residents < kind.unlock.residents) return `需要 ${kind.unlock.residents} 位居民`
+    if (s.citizens < kind.unlock.citizens) return `需要 ${kind.unlock.citizens} 位市民`
     return null
   }
 
@@ -567,31 +567,31 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
   }
 
   const buildMenu = () => {
-    panel.append(header("build", iconEl("build", 30), el("p", "sub", "Pick one, then click the map · Esc to stop")))
+    panel.append(header("建造", iconEl("build", 30), el("p", "sub", "选择项目，再点击地图 · Esc 取消")))
     for (const category of categoryOrder) {
       const options = kindOrder.filter((id) => kinds[id].category === category && kinds[id].buildable)
       if (options.length === 0) continue
-      const box = section(category, categoryIcon[category])
+      const box = section({ storage: "仓储", gathering: "采集", crafts: "制造", food: "食品", services: "公共服务" }[category], categoryIcon[category])
       box.style.borderTop = `3px solid ${hex(categoryColor[category])}`
       for (const id of options) {
         const kind = kinds[id]
         const option = el("button", "option")
         const cost = costChips(kind.cost)
-        cost.box.prepend(el("span", "cap", "cost"))
+        cost.box.prepend(el("span", "cap", "费用"))
         const terms = el("span", "chips")
         const r = kind.recipe
         const does = [
-          r ? `<span class="chip" title="${r.input ? `turns ${r.inputs} ${goods[r.input].title} into ${r.batch} ${goods[r.output].title}` : `makes ${r.batch} ${goods[r.output].title}`} every ${r.seconds} s">${r.input ? `${goodIcon(r.input, 14)}<i>→</i>` : ""}${goodIcon(r.output, 14)}${r.batch > 1 ? r.batch : ""}</span>` : "",
-          kind.service ? `<span class="chip" title="its walkers serve the homes within ${kind.service.range} road cells of its door">${icon(kind.service.service === "goods" ? "trade" : kind.service.service === "faith" ? "faith" : kind.service.service === "repair" ? "repair" : kind.service.service, 14)}${kind.service.range}</span>` : "",
-          kind.holds && !kind.recipe && !kind.service ? `<span class="chip" title="holds up to ${kind.holds.cap} of each good${kind.keeps ? `, and keeps food ${kind.keeps} times as long` : ""}">${icon("jobs", 14)}${kind.holds.cap}</span>` : "",
-          kind.workers > 0 ? `<span class="chip dim" title="${kind.workers} ${kind.crew} to work it, from homes within 15 road cells">${icon(kind.crew === "citizens" ? "citizens" : "settlers", 14)}${kind.workers}</span>` : "",
-          kind.appeal ? `<span class="chip ${kind.appeal.value < 0 ? "bad" : "good"}" title="desirability ${kind.appeal.value > 0 ? "+" : ""}${kind.appeal.value} beside it, out to ${kind.appeal.reach} cells${kind.appeal.value < 0 ? ": keep homes away" : ": homes like it"}">${icon("appeal", 14)}${kind.appeal.value > 0 ? "+" : ""}${kind.appeal.value}</span>` : "",
-          `<span class="chip dim" title="upkeep: coins a minute while it stands (a quarter when paused)">${icon("upkeep", 14)}${kind.upkeep}/min</span>`
+          r ? `<span class="chip" title="${r.input ? `将 ${r.inputs} ${goods[r.input].title} 加工成 ${r.batch} ${goods[r.output].title}` : `生产 ${r.batch} ${goods[r.output].title}`}，每 ${r.seconds} 秒一次">${r.input ? `${goodIcon(r.input, 14)}<i>→</i>` : ""}${goodIcon(r.output, 14)}${r.batch > 1 ? r.batch : ""}</span>` : "",
+          kind.service ? `<span class="chip" title="服务人员为距入口 ${kind.service.range} 格道路内的住宅提供服务">${icon(kind.service.service === "goods" ? "trade" : kind.service.service === "faith" ? "faith" : kind.service.service === "repair" ? "repair" : kind.service.service, 14)}${kind.service.range}</span>` : "",
+          kind.holds && !kind.recipe && !kind.service ? `<span class="chip" title="每种物资最多储存 ${kind.holds.cap} 件${kind.keeps ? `，鲜鱼和面包的腐坏速度降至原来的 1/${kind.keeps}` : ""}">${icon("jobs", 14)}${kind.holds.cap}</span>` : "",
+          kind.workers > 0 ? `<span class="chip dim" title="需要 ${kind.workers} 位${kind.crew === "citizens" ? "市民" : "移民"}，来自15格道路内的住宅">${icon(kind.crew === "citizens" ? "citizens" : "settlers", 14)}${kind.workers}</span>` : "",
+          kind.appeal ? `<span class="chip ${kind.appeal.value < 0 ? "bad" : "good"}" title="周围宜居度 ${kind.appeal.value > 0 ? "+" : ""}${kind.appeal.value}，影响 ${kind.appeal.reach} 格${kind.appeal.value < 0 ? "：住宅应远离" : "：适合住宅"}">${icon("appeal", 14)}${kind.appeal.value > 0 ? "+" : ""}${kind.appeal.value}</span>` : "",
+          `<span class="chip dim" title="维护费：每分钟的金币支出（暂停时为四分之一）">${icon("upkeep", 14)}${kind.upkeep}/分钟</span>`
         ].join("")
-        terms.innerHTML = `<span class="cap">does</span>${does}`
+        terms.innerHTML = `<span class="cap">效果</span>${does}`
         const blurb = el("span", "blurb", kind.blurb)
         option.append(picture(id), el("span", "name", kind.title.toLowerCase()), cost.box, terms, blurb)
-        option.title = `${kind.title}: ${kind.blurb}${kind.workers > 0 ? ` · ${kind.workers} ${kind.crew === "citizens" ? "citizen" : "settler"} workers from within 15 road cells` : ""}${kind.service ? ` · walkers reach ${kind.service.range} road cells` : ""}${kind.appeal ? ` · desirability ${kind.appeal.value > 0 ? "+" : ""}${kind.appeal.value} out to ${kind.appeal.reach} cells` : ""} · ${kind.upkeep} coins a minute`
+        option.title = `${kind.title}：${kind.blurb}${kind.workers > 0 ? ` · ${kind.workers} ${kind.crew === "citizens" ? "市民" : "移民"}工人，来自15格道路以内` : ""}${kind.service ? ` · 服务范围 ${kind.service.range} 格道路` : ""}${kind.appeal ? ` · 宜居度 ${kind.appeal.value > 0 ? "+" : ""}${kind.appeal.value}，影响 ${kind.appeal.reach} 格` : ""} · ${kind.upkeep} 金币/分钟`
         option.onclick = () => place(id)
         live.push(() => {
           const lock = lockText(kind)
@@ -606,9 +606,9 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     }
     // Parks are laid out piece by piece: ground first, then what stands on it.
     const parks = section(
-      "parks",
+      "公园",
       "decor",
-      `Lay ground, then set furnishings on it. Ground that touches is one park: the more it holds the nicer the streets around it (citizens need 5, townhouses 15). One furnishing counts for every ${parkRules.cellsPerProp} cells.`
+      `先铺地面，再摆放设施。相邻地面组成一座公园：设施越丰富，附近宜居度越高（市民住宅需要5，市民宅邸需要15）。每 ${parkRules.cellsPerProp} 格地面可计入一件设施。`
     )
     parks.style.borderTop = "3px solid #4f9a6a"
     const pieces: ReadonlyArray<{ readonly id: GroundId | PropId; readonly piece: ParkPiece; readonly pick: () => void; readonly ground: boolean }> = [
@@ -616,16 +616,16 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
       ...propIds.map((id) => ({ id, piece: props[id], pick: () => furnish(id), ground: false }))
     ]
     for (const { id, piece, pick, ground } of pieces) {
-      if (ground && id === "lawn") parks.append(el("p", "empty", "ground · drag a rectangle"))
-      if (!ground && id === "lamp") parks.append(el("p", "empty", "furnishings · click a cell of park"))
+      if (ground && id === "lawn") parks.append(el("p", "empty", "地面 · 拖出矩形铺设"))
+      if (!ground && id === "lamp") parks.append(el("p", "empty", "设施 · 点击公园格子摆放"))
       const option = el("button", "option")
       const cost = costChips(piece.cost)
-      cost.box.prepend(el("span", "cap", "cost"))
+      cost.box.prepend(el("span", "cap", "费用"))
       const terms = el("span", "chips")
-      terms.innerHTML = `<span class="cap">does</span><span class="chip good" title="beauty it adds to its park">${icon("appeal", 14)}+${piece.beauty}</span><span class="chip dim" title="upkeep, coins a minute">${icon("upkeep", 14)}${piece.upkeep}/min</span>`
+      terms.innerHTML = `<span class="cap">效果</span><span class="chip good" title="为公园增加的美观值">${icon("appeal", 14)}+${piece.beauty}</span><span class="chip dim" title="维护费，金币/分钟">${icon("upkeep", 14)}${piece.upkeep}/分钟</span>`
       const blurb = el("span", "blurb", piece.blurb)
       option.append(picture(`park:${id}`), el("span", "name", piece.title.toLowerCase()), cost.box, terms, blurb)
-      option.title = `${piece.title}: ${piece.blurb} · beauty +${piece.beauty}${ground ? " a cell" : ""} · ${piece.upkeep} coins a minute`
+      option.title = `${piece.title}：${piece.blurb} · 美观值 +${piece.beauty}${ground ? " /格" : ""} · ${piece.upkeep} 金币/分钟`
       option.onclick = pick
       live.push(() => {
         const lock = lockText(piece)
@@ -659,22 +659,22 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
 
   const townPanel = () => {
     const sub = el("p", "sub")
-    panel.append(header("town", iconEl("town", 30), sub))
+    panel.append(header("城镇", iconEl("town", 30), sub))
 
     // The goals that complete the town, and how near each one is.
-    const goals = section("goals", "goal", "Meet every goal at once and hold them for two minutes to complete the town.")
+    const goals = section("目标", "goal", "同时达成所有目标并维持两分钟，即可完成城镇建设。")
     const goalRows: Array<{ line: HTMLElement; mark: HTMLElement; text: HTMLElement; value: HTMLElement }> = []
     const goalNote = el("p", "empty")
     panel.append(goals)
 
     const mood = section(
+      "支持度",
       "approval",
-      "approval",
-      `Homes hold more residents when approval is high and fewer when it is low. At −50 for two minutes, the town turns the mayor out.`
+      `支持度越高，住宅容纳的居民越多。支持度持续两分钟低于或等于−50，居民就会赶走市长。`
     )
     const moodLine = el("div", "row")
     const moodValue = el("span", "count total")
-    moodLine.append(el("span", "label", "now → heading for"), moodValue)
+    moodLine.append(el("span", "label", "当前 → 目标"), moodValue)
     const moodTrack = el("div", "meter")
     const moodFill = el("span", "fill")
     moodTrack.append(moodFill)
@@ -683,28 +683,28 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     panel.append(mood)
 
     const treasury = section(
+      "财政",
       "treasury",
-      "treasury",
-      "Coins a minute. Taxes come only from homes that are fed, in proportion to the needs they have met. Administration grows faster than the town. Three minutes in debt and the town is bankrupt."
+      "单位为金币/分钟。只有获得食物的住宅才纳税，税额与需求满足程度成正比。行政开支会随城镇扩张加速增长。连续负债三分钟将导致破产。"
     )
-    const taxes = row(treasury, "taxes", "taxes")
-    const supplied = row(treasury, "if every home were supplied", "homes")
+    const taxes = row(treasury, "税收", "taxes")
+    const supplied = row(treasury, "需求全部满足时", "homes")
     supplied.classList.add("dim")
     const suppliedNote = el("p", "empty")
     treasury.append(suppliedNote)
-    const traded = row(treasury, "trade", "trade")
-    const upkeep = row(treasury, "upkeep", "upkeep")
-    const admin = row(treasury, "administration", "town")
-    const net = row(treasury, "a minute", "coins")
+    const traded = row(treasury, "贸易", "trade")
+    const upkeep = row(treasury, "维护费", "upkeep")
+    const admin = row(treasury, "行政开支", "town")
+    const net = row(treasury, "每分钟", "coins")
     net.classList.add("total")
     const coinLine = el("div", "spark")
     treasury.append(coinLine)
     panel.append(treasury)
 
     const levers = section(
-      "tax rates",
+      "税率",
       "taxes",
-      `Lower taxes raise approval, higher ones lower it, weighed by how many of each tier there are. Above ${moodRules.grudge.above}% the town also keeps a grudge that outlasts the rate: cutting taxes at the end does not undo a term of squeezing.`
+      `降低税率提高支持度，加税降低支持度，影响按各阶层人数加权。税率超过 ${moodRules.grudge.above}% 会积累怨恨，降税后仍缓慢消退；临近任期结束才降税无法抵消长期压榨。`
     )
     for (const tier of ["settlers", "citizens"] as const) {
       const line = el("div", "row lever")
@@ -715,7 +715,7 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
       controls.append(minus, value, plus)
       const name = el("span", "label")
       name.innerHTML = icon(tier, 16)
-      name.append(document.createTextNode(tier))
+      name.append(document.createTextNode(tier === "settlers" ? "移民" : "市民"))
       line.append(name, controls)
       const effect = el("p", "effect")
       levers.append(line, effect)
@@ -731,19 +731,19 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
         const rate = ui.stats?.policy[tier] ?? 100
         value.textContent = `${rate}%`
         const sway = Math.round((100 - rate) * moodRules.perTaxPoint)
-        const grudge = rate > moodRules.grudge.above ? " · a grudge builds while it stays this high, and fades slowly" : ""
-        effect.textContent = (sway === 0 ? "the usual rate" : `${signed(sway)} approval`) + grudge
+        const grudge = rate > moodRules.grudge.above ? " · 持续高税率会积累怨恨，且消退缓慢" : ""
+        effect.textContent = (sway === 0 ? "标准税率" : `支持度 ${signed(sway)}`) + grudge
         effect.className = `effect ${sway > 0 ? "up" : sway < 0 ? "down" : ""}`
       })
     }
     panel.append(levers)
 
-    const town = section("people", "people")
-    const settlers = row(town, "settlers", "settlers")
-    const citizens = row(town, "citizens", "citizens")
-    const burghers = row(town, "of them, burghers", "burghers")
-    const homes = row(town, "homes", "homes")
-    const work = row(town, "jobs filled", "jobs")
+    const town = section("人口", "people")
+    const settlers = row(town, "移民", "settlers")
+    const citizens = row(town, "市民", "citizens")
+    const burghers = row(town, "其中富裕市民", "burghers")
+    const homes = row(town, "住宅", "homes")
+    const work = row(town, "已就业", "jobs")
     const workNote = el("p", "empty")
     town.append(workNote)
     const peopleLine = el("div", "spark")
@@ -751,9 +751,9 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     panel.append(town)
 
     const needs = section(
-      "homes supplied",
+      "需求满足情况",
       "homes",
-      "A hungry home pays no taxes. Settlers need food (fish, smoked fish, or bread) from a market, and a cottage with bread besides pays half again; citizens and burghers need bread, cloth, and faith. Cloth is only brought to streets with desirability 5 or more. Fish rots in about three minutes and bread in five; a granary keeps them five times as long."
+      "挨饿的住宅不纳税。移民需要市场供应食物（鲜鱼、熏鱼或面包），小屋获得面包供应后，税收增加50%；市民和富裕市民需要面包、布料及信仰。布料只配送至宜居度达到5的街区。鲜鱼和面包会逐渐腐坏，鲜鱼更快；粮仓可将腐坏速度降至五分之一。"
     )
     const needIcons: Readonly<Record<"food" | "bread" | "cloth" | "faith", IconName>> = {
       food: "fish",
@@ -774,25 +774,25 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
       needs.append(line)
       return { n, fill, value }
     })
-    const larderLine = row(needs, "food in store", "flour")
-    const eatenLine = row(needs, "eaten · rotted last minute", "fish")
-    const troubleLine = row(needs, "sick homes · on fire", "health")
+    const larderLine = row(needs, "食物库存", "flour")
+    const eatenLine = row(needs, "上分钟食用 · 腐坏", "fish")
+    const troubleLine = row(needs, "患病住户 · 着火建筑", "health")
     panel.append(needs)
 
     const crown = section(
-      "the crown",
+      "王室",
       "crown",
-      `Sending what the crown asks for earns coins. A missed request is a fine, and the town remembers the snub for a while; too many missed in a row and the crown dismisses the mayor.`
+      `交付王室要求的物资可获得金币。逾期会受罚，并暂时降低支持度；连续多次未交付，王室将撤换市长。`
     )
-    const crownLine = row(crown, "requests met · missed", "goal")
+    const crownLine = row(crown, "已交付 · 未交付", "goal")
     const crownNext = el("p", "empty")
     crown.append(crownNext)
     panel.append(crown)
 
     const store = section(
-      "goods and trade",
+      "物资与贸易",
       "trade",
-      "Traders buy what the town sells beyond what it keeps, and sell it what it buys up to that, at half again the price. Prices fall as the town sells and rise as it buys. Click sell / buy / — to change a good."
+      "出售超过保留量的物资，或以售价的1.5倍买入物资直至保留量。卖出会压低价格，买入会抬高价格。点击“出售 / 买入 / —”切换贸易模式。"
     )
     const reserveLine = el("div", "row lever")
     const reserveControls = el("span", "controls")
@@ -800,7 +800,7 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     const reserveValue = el("span", "rate")
     const more = el("button", "frame step", "+")
     reserveControls.append(fewer, reserveValue, more)
-    reserveLine.append(el("span", "label", "keep in store"), reserveControls)
+    reserveLine.append(el("span", "label", "保留量"), reserveControls)
     store.append(reserveLine)
     const stepReserve = (by: number) => {
       const now = ui.stats?.policy.reserve ?? 25
@@ -813,7 +813,7 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     const goodRows = goodIds.map((g) => {
       const line = el("div", "row good-row")
       const mode = el("button", "frame mode", "")
-      mode.title = "Click to sell, buy, or neither"
+      mode.title = "点击切换出售、买入或不交易"
       mode.onclick = () => {
         const s = ui.stats
         if (!s) return
@@ -834,7 +834,7 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     })
     panel.append(store)
 
-    const chronicle = section("chronicle", "chronicle")
+    const chronicle = section("大事记", "chronicle")
     const lines = el("div", "chronicle")
     chronicle.append(lines)
     panel.append(chronicle)
@@ -842,8 +842,8 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     live.push(() => {
       const s = ui.stats
       if (!s) return
-      sub.textContent = `${sizes[s.charter.size].title}, ${lands[s.charter.land].title} land · ${s.charter.term}-minute term`
-      sub.title = `seed ${s.charter.seed}`
+      sub.textContent = `${sizes[s.charter.size].title}地图，资源${lands[s.charter.land].title} · 任期 ${s.charter.term} 分钟`
+      sub.title = `地图种子 ${s.charter.seed}`
       // Goals.
       while (goalRows.length < s.goals.length) {
         const line = el("div", "row goal")
@@ -864,9 +864,9 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
         r.value.textContent = g.value
       })
       goalNote.textContent = s.fate.governing
-        ? "Complete: the mayor governs on to the end of the term."
+        ? "建设完成：市长将继续执政至任期结束。"
         : s.fate.complete !== null
-          ? `All met: hold them ${clockText(s.fate.complete)} more.`
+          ? `所有目标已达成：还需维持 ${clockText(s.fate.complete)}。`
           : ""
       goalNote.style.display = goalNote.textContent ? "" : "none"
       // Approval.
@@ -888,20 +888,20 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
       money(taxes, s.taxes)
       supplied.textContent = `+${s.suppliedTaxes}`
       const gap = s.suppliedTaxes - s.taxes
-      suppliedNote.textContent = gap > Math.max(10, s.taxes * 0.1) ? `${gap} coins a minute left on the table: a hungry home pays nothing, a cottage with bread pays half again, a fine street a quarter more` : ""
+      suppliedNote.textContent = gap > Math.max(10, s.taxes * 0.1) ? `每分钟少收 ${gap} 金币：挨饿的住宅不纳税，供应面包的小屋多缴50%，优质街区最多多缴25%` : ""
       suppliedNote.style.display = suppliedNote.textContent ? "" : "none"
       money(traded, s.trade)
       money(upkeep, -s.upkeep)
       money(admin, -s.admin)
-      money(net, s.net, " coins")
+      money(net, s.net, " 金币")
       settlers.textContent = String(s.settlers)
       citizens.textContent = String(s.citizens)
       burghers.textContent = String(s.burghers)
       homes.textContent = String(s.homes)
-      work.textContent = `${s.employed} of ${s.jobs}`
+      work.textContent = `${s.employed} / ${s.jobs}`
       workNote.textContent = s.shortStaffed.length === 0
-        ? "every workplace has its crew"
-        : `${s.shortStaffed.length} short of workers: ${s.shortStaffed.slice(0, 4).map((w) => `${w.title} ${w.assigned}/${w.needed}${w.nobodyNear ? " (nobody within reach)" : ""}`).join(", ")}${s.shortStaffed.length > 4 ? ", …" : ""} · click the jobs counter to visit them`
+        ? "所有工作场所人手充足"
+        : `${s.shortStaffed.length} 处缺少工人：${s.shortStaffed.slice(0, 4).map((w) => `${w.title} ${w.assigned}/${w.needed}${w.nobodyNear ? "（范围内无人）" : ""}`).join("、")}${s.shortStaffed.length > 4 ? "、…" : ""} · 点击就业人数逐一定位`
       for (const b of bars) {
         const share = s.homes > 0 ? s.needs[b.n] / s.homes : 0
         b.fill.style.width = `${Math.round(share * 100)}%`
@@ -913,19 +913,19 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
       troubleLine.textContent = `${s.sick} · ${s.burning}`
       crownLine.textContent = `${s.crown.met} · ${s.crown.missed}`
       crownNext.innerHTML = s.crown.open
-        ? `Wants <b>${s.crown.amount} ${goods[s.crown.good].title}</b> · ${clockText(s.crown.left)} left · +${s.crown.reward} coins`
-        : `Next request in ${clockText(s.crown.next)} · ${s.crown.patience} missed in a row ends the term`
+        ? `需要 <b>${s.crown.amount} ${goods[s.crown.good].title}</b> · 剩余 ${clockText(s.crown.left)} · +${s.crown.reward} 金币`
+        : `下次要求还有 ${clockText(s.crown.next)} · 连续 ${s.crown.patience} 次未交付将结束任期`
       // Goods' change over the last minute of samples.
       const ago = history[Math.max(0, history.length - 1 - Math.round(60 / SAMPLE_SECONDS))]
       reserveValue.textContent = String(s.policy.reserve)
       for (const r of goodRows) {
         const change = ago ? s.stock[r.g] - ago.stock[r.g] : 0
-        r.value.innerHTML = `${s.stock[r.g]}${change !== 0 ? ` <small class="${change > 0 ? "up" : "down"}">${change > 0 ? "+" : ""}${change}/min</small>` : ""}`
+        r.value.innerHTML = `${s.stock[r.g]}${change !== 0 ? ` <small class="${change > 0 ? "up" : "down"}">${change > 0 ? "+" : ""}${change}/分钟</small>` : ""}`
         const now: TradeMode = s.policy.sells.includes(r.g) ? "sell" : s.policy.buys.includes(r.g) ? "buy" : "none"
-        r.mode.textContent = now === "none" ? "—" : now
+        r.mode.textContent = now === "none" ? "—" : now === "sell" ? "出售" : "买入"
         r.mode.className = `frame mode ${now === "none" ? "" : now}`
         const price = now === "buy" ? askOf(r.g, s.prices[r.g]) : Math.round(priceOf(r.g, s.prices[r.g]) * 10) / 10
-        r.price.textContent = `${price}c${s.prices[r.g] !== 100 ? ` (${s.prices[r.g]}%)` : ""}`
+        r.price.textContent = `${price}金币${s.prices[r.g] !== 100 ? ` (${s.prices[r.g]}%)` : ""}`
       }
       const samples = s.history
       const coinsSvg = sparkline(samples.map((h) => h.coins))
@@ -984,7 +984,7 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     if (p.type === "build") return buildMenu()
     if (p.type === "town") return townPanel()
 
-    const title = p.type === "building" ? kinds[p.kind].title.toLowerCase() : p.type === "house" ? tierHome[p.tier] : p.type === "park" ? "park" : "ruin"
+    const title = p.type === "building" ? kinds[p.kind].title.toLowerCase() : p.type === "house" ? tierHome[p.tier] : p.type === "park" ? "公园" : "废墟"
     const status = el("span", "pill")
     const about = el(
       "p",
@@ -992,24 +992,24 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
       p.type === "building"
         ? kinds[p.kind].blurb
         : p.type === "ruin"
-          ? "bulldoze it to clear the plot"
+          ? "拆除废墟以清理地块"
           : p.type === "park"
-            ? "every cell of ground that touches this one: lay more, or set furnishings on it, to make the streets around it nicer"
+            ? "所有相连地块组成这座公园；扩建地面或摆放设施，提高附近街区的宜居度"
           : p.tier === 1
-            ? "settlers: fish or bread from a market keeps them; they do the rough work"
+            ? "移民：需要市场供应鲜鱼或面包；负责基础劳动"
             : p.tier === 2
-              ? "citizens: they need bread, cloth, and faith, and a street with desirability 5; they do the skilled work"
-              : "burghers: a citizens' home on a fine street (desirability 15) that every service calls on"
+              ? "市民：需要面包、布料、信仰，以及宜居度达到5的街区；负责技术工作"
+              : "富裕市民：居住在宜居度达到15、所有服务均覆盖的优质街区"
     )
     const below = el("div", "")
     below.append(status, about)
     panel.append(header(title, p.type === "ruin" ? iconEl("condition", 30) : p.type === "park" ? iconEl("decor", 30) : picture(p.type === "building" ? p.kind : p.tier), below))
-    const box = section(p.type === "building" ? "at work" : p.type === "ruin" ? "what is left" : p.type === "park" ? "what makes it" : "household", p.type === "building" ? "jobs" : p.type === "park" ? "appeal" : "homes")
+    const box = section(p.type === "building" ? "运行情况" : p.type === "ruin" ? "残留情况" : p.type === "park" ? "公园构成" : "住户", p.type === "building" ? "jobs" : p.type === "park" ? "appeal" : "homes")
     box.classList.add("lines")
     const rows: Array<HTMLElement> = []
     panel.append(box)
     // A home: what keeps it from the next tier, in its own box, so the cause is never a word in a longer line.
-    const nextBox = p.type === "house" && p.tier < 3 ? section(`to become ${home.tiers[(p.tier + 1) as Tier].title}`, "citizens", "Every line here must clear before the home grows. Needs come from walkers; the street from what stands around it.") : null
+    const nextBox = p.type === "house" && p.tier < 3 ? section(`升级为${tierHome[(p.tier + 1) as Tier]}`, "citizens", "满足以下全部条件后住宅才能升级。需求由服务人员满足，宜居度由周围环境决定。") : null
     const nextRows: Array<HTMLElement> = []
     const nextNote = el("p", "empty")
     if (nextBox) {
@@ -1021,22 +1021,22 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
       const now = ui.panel
       if (!now || now.type === "build" || now.type === "town" || now.type !== p.type) return
       if (now.type === "building") {
-        status.textContent = now.problem ?? now.status
+        status.textContent = now.problem ?? { working: "工作中", idle: "空闲", blocked: "库存已满", unconnected: "未连接道路", unstaffed: "缺少工人", starved: "缺少原料", building: "施工中", paused: "已暂停" }[now.status]
         status.className = `pill ${now.problem !== null ? "problem" : now.status === "working" ? "working" : ""}`
       } else if (now.type === "house") {
-        status.textContent = `${home.tiers[now.tier].residents} at most`
+        status.textContent = `最多 ${home.tiers[now.tier].residents} 人`
         status.className = "pill working"
       } else if (now.type === "park") {
-        status.textContent = `${now.value > 0 ? "+" : ""}${now.value} out to ${now.reach} cells`
+        status.textContent = `${now.value > 0 ? "+" : ""}${now.value}，影响 ${now.reach} 格`
         status.className = "pill working"
       } else {
-        status.textContent = now.cause
+        status.textContent = { burnt: "烧毁", collapsed: "坍塌", derelict: "荒废" }[now.cause]
         status.className = "pill problem"
       }
       syncLines(box, rows, now.lines)
       if (nextBox && now.type === "house") {
         syncLines(nextBox, nextRows, now.blockers)
-        nextNote.textContent = now.blockers.length === 0 ? "nothing stands in the way: it grows when the next resident settles in" : ""
+        nextNote.textContent = now.blockers.length === 0 ? "升级条件已满足：下一位居民入住时升级" : ""
         nextNote.style.display = now.blockers.length === 0 ? "" : "none"
         nextBox.append(nextNote)
       }
@@ -1044,8 +1044,8 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     if (!(p.type === "building" && p.kind === "townhall")) {
       const actions = el("div", "actions")
       if (p.type === "building") {
-        const pause = el("button", "frame", "Pause work")
-        pause.title = "A paused building has no workers and pays a quarter of its upkeep"
+        const pause = el("button", "frame", "暂停工作")
+        pause.title = "暂停的建筑不雇佣工人，维护费降至四分之一"
         pause.onclick = () => {
           const now = ui.panel
           if (now?.type === "building") ui.edits.push({ type: "pause", cell: now.cell, on: !now.paused })
@@ -1053,12 +1053,12 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
         live.push(() => {
           const now = ui.panel
           if (now?.type !== "building") return
-          pause.textContent = now.paused ? "Resume work" : "Pause work"
+          pause.textContent = now.paused ? "恢复工作" : "暂停工作"
           pause.style.display = now.pausable ? "" : "none"
         })
         actions.append(pause)
       }
-      const remove = el("button", "frame danger", "Remove")
+      const remove = el("button", "frame danger", "拆除")
       remove.onclick = () => ui.edits.push({ type: "remove", cell: p.cell })
       actions.append(remove)
       panel.append(actions)
@@ -1117,11 +1117,11 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     dialog.replaceChildren()
     const card = el("div", "sheet")
     card.append(
-      el("h2", "", "found a town"),
+      el("h2", "", "建立城镇"),
       el(
         "p",
         "sub",
-        "Choose the land and how long the term runs. Grow the town until it is complete, or keep it from bankruptcy, revolt, and ruin until the term is out."
+        "选择地图与任期长度。发展城镇，完成所有目标，或坚持到任期结束，避免破产、叛乱与衰败。"
       )
     )
     const body = el("div", "charter")
@@ -1160,23 +1160,23 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     }
     const refreshers = [
       group(
-        "land",
+        "地图大小",
         sizeIds,
         (v) => sizes[v].title,
-        (v) => `${sizes[v].goal.residents} residents and ${sizes[v].goal.coins} coins to complete it`,
+        (v) => `达到 ${sizes[v].goal.residents} 位居民和 ${sizes[v].goal.coins} 金币，完成城镇建设`,
         () => choice.size,
         (v) => (choice.size = v)
       ),
       group(
-        "term",
+        "任期",
         TERMS,
-        (v) => `${v} min`,
-        (v) => `${v} minutes of the town at 1×: six years, a winter at the end of each after the first`,
+        (v) => `${v} 分钟`,
+        (v) => `正常速度下任期为 ${v} 分钟，共六年；从第二年起，每年末进入冬季`,
         () => choice.term,
         (v) => (choice.term = v)
       ),
       group(
-        "richness",
+        "资源丰度",
         landIds,
         (v) => lands[v].title,
         (v) => lands[v].blurb,
@@ -1186,7 +1186,7 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     ]
     const seedLine = el("div", "row")
     const seedText = el("span", "")
-    const reroll = el("button", "frame", "other land")
+    const reroll = el("button", "frame", "换一张地图")
     reroll.onclick = () => {
       choice.seed = (Math.random() * 0x7fffffff) >>> 0
       refresh()
@@ -1196,12 +1196,12 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     const refresh = () => {
       for (const r of refreshers) r()
       const land = drawLand(map)
-      seedText.textContent = `seed ${choice.seed}`
-      facts.textContent = `${land.cells} cells of land · ${land.trees.length} trees · ${land.rocks.filter((r) => !r.ore).length} stone · ${land.rocks.filter((r) => r.ore).length} ore · ${lands[choice.land].coins} coins to start`
+      seedText.textContent = `地图种子 ${choice.seed}`
+      facts.textContent = `陆地 ${land.cells} 格 · 树木 ${land.trees.length} 棵 · 岩石 ${land.rocks.filter((r) => !r.ore).length} 处 · 矿床 ${land.rocks.filter((r) => r.ore).length} 处 · 初始资金 ${lands[choice.land].coins} 金币`
     }
     refresh()
     const actions = el("div", "actions")
-    const found = el("button", "frame primary", "Found the town")
+    const found = el("button", "frame primary", "建立城镇")
     found.onclick = () => {
       ui.edits.push({ type: "newTown", charter: { ...choice } })
       history.length = 0
@@ -1214,7 +1214,7 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     }
     actions.append(found)
     if (cancellable) {
-      const cancel = el("button", "frame", "Cancel")
+      const cancel = el("button", "frame", "取消")
       cancel.onclick = () => closeCharter()
       actions.append(cancel)
     }
@@ -1256,12 +1256,12 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
   }
   /** What became of a town whose term ran out. */
   const verdictOf = (s: Stats): string => {
-    if (s.fate.governing) return "complete"
+    if (s.fate.governing) return "建设完成"
     const residents = s.settlers + s.citizens
-    if (s.fate.peak < 40) return "the town never took root"
-    if (residents >= sizes[s.charter.size].goal.residents * 0.75) return "flourishing"
-    if (residents >= s.fate.peak * 0.7) return "holding on"
-    return "declining"
+    if (s.fate.peak < 40) return "城镇未能站稳脚跟"
+    if (residents >= sizes[s.charter.size].goal.residents * 0.75) return "欣欣向荣"
+    if (residents >= s.fate.peak * 0.7) return "勉强维持"
+    return "走向衰败"
   }
   let reckoned = ""
   let reckoningOpen = false
@@ -1280,18 +1280,18 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     const id = `${s.charter.seed}|${s.fate.state}|${s.fate.at}`
     result.textContent =
       s.fate.state === "won"
-        ? "the town is complete · see how"
+        ? "城镇建设完成 · 查看结算"
         : s.fate.state === "lost"
-          ? "the term is lost · see how"
-          : "the term is over · see how"
+          ? "任期失败 · 查看结算"
+          : "任期结束 · 查看结算"
     if (id === reckoned) return
     reckoned = id
     const title =
       s.fate.state === "won"
-        ? "the town is complete"
+        ? "城镇建设完成"
         : s.fate.state === "lost"
-          ? s.fate.reason.split(":")[0]!.toLowerCase()
-          : `the term is over: ${verdictOf(s)}`
+          ? s.fate.reason.split(/[:：]/)[0]!.toLowerCase()
+          : `任期结束：${verdictOf(s)}`
     reckoning.replaceChildren()
     const card = el("div", "sheet wide")
     card.append(el("h2", "", title), el("p", "sub", s.fate.reason))
@@ -1301,36 +1301,36 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
       f.append(el("b", "", value), el("span", "", label))
       facts.append(f)
     }
-    fact("minutes in office", `${Math.round(s.fate.at)}`)
-    fact("residents", `${s.settlers + s.citizens}`)
-    fact("citizens", `${s.citizens}`)
-    fact("coins", `${s.coins}`)
-    fact("approval", signed(s.mood.approval))
-    fact("crown met · missed", `${s.crown.met} · ${s.crown.missed}`)
-    fact("score", `${s.fate.score}`)
+    fact("执政分钟数", `${Math.round(s.fate.at)}`)
+    fact("居民", `${s.settlers + s.citizens}`)
+    fact("市民", `${s.citizens}`)
+    fact("金币", `${s.coins}`)
+    fact("支持度", signed(s.mood.approval))
+    fact("王室交付 · 逾期", `${s.crown.met} · ${s.crown.missed}`)
+    fact("得分", `${s.fate.score}`)
     card.append(facts)
     const graph = el("div", "chart")
     graph.innerHTML = chart(s)
-    card.append(graph, el("p", "legend", "— residents (dashed: the goal) · coins · - - approval · shaded: winters"))
+    card.append(graph, el("p", "legend", "— 居民（虚线为目标） · 金币 · - - 支持度 · 阴影为冬季"))
     const story = el("div", "chronicle")
     story.innerHTML = s.chronicle.map((l) => `<p><b>${clockText(Math.round(l.tick / 60))}</b> ${l.text}</p>`).join("")
     card.append(story)
     const actions = el("div", "actions")
     if (s.fate.state === "won") {
-      const govern = el("button", "frame primary", "Keep governing")
-      govern.title = "Stay on to the end of the term: the town is already complete"
+      const govern = el("button", "frame primary", "继续执政")
+      govern.title = "城镇建设已完成，继续执政至任期结束"
       govern.onclick = () => {
         ui.edits.push({ type: "govern" })
         showReckoning(false)
       }
       actions.append(govern)
     }
-    const again = el("button", "frame" + (s.fate.state === "won" ? "" : " primary"), "Found a new town")
+    const again = el("button", "frame" + (s.fate.state === "won" ? "" : " primary"), "建立新城镇")
     again.onclick = () => {
       showReckoning(false)
       openCharter(true)
     }
-    const look = el("button", "frame", "Look at the town")
+    const look = el("button", "frame", "查看城镇")
     look.onclick = () => showReckoning(false)
     actions.append(again, look)
     card.append(actions)
@@ -1353,27 +1353,27 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     syncPanel()
     const s = ui.stats
     if (s) {
-      coins.innerHTML = `${icon("coins", 20)}<span class="stack"><b>${s.coins}</b><small class="${s.net >= 0 ? "up" : "down"}">${s.net >= 0 ? "+" : ""}${s.net}/min</small></span>`
-      coins.title = "Coins in the treasury, and what it gains (or loses) a minute"
+      coins.innerHTML = `${icon("coins", 20)}<span class="stack"><b>${s.coins}</b><small class="${s.net >= 0 ? "up" : "down"}">${s.net >= 0 ? "+" : ""}${s.net}/分钟</small></span>`
+      coins.title = "当前财政资金，以及每分钟的盈亏"
       coins.classList.toggle("debt", s.coins < 0)
       const left = Math.max(0, s.charter.term * 60 - Math.floor(s.minute * 60))
       const severity = (w: typeof s.season.coming) => (w === null ? "" : ` (${winters[w].title})`)
       const until = s.season.winter
-        ? `${winters[s.season.severity ?? "normal"].title} winter · spring in ${clockText(s.season.left)}`
+        ? `${winters[s.season.severity ?? "normal"].title} · 距离春季 ${clockText(s.season.left)}`
         : s.season.coming === null
-          ? "no more winters this term"
-          : `winter in ${clockText(s.season.left)}${severity(s.season.coming)}`
-      clock.innerHTML = `${icon(s.season.winter ? "winter" : "clock", 20)}<span class="stack"><b>${clockText(left)}</b><small class="${s.season.winter ? "winter" : s.season.coming === "hard" ? "down" : ""}">year ${s.season.year} · ${until}</small></span>`
-      clock.title = `${s.season.winter ? "Winter: fields lie still, fishing is slow, and homes eat faster" : "Time left in the term"}\nThe almanac: the coming winter is ${s.season.coming === null ? "beyond the term" : winters[s.season.coming].title}, the one after ${s.season.after === null ? "beyond the term" : winters[s.season.after].title}.\nMild: fishing at ${Math.round(winters.mild.fishing * 100)}%. Normal: ${Math.round(winters.normal.fishing * 100)}%. Hard: half as long again, fishing at ${Math.round(winters.hard.fishing * 100)}%, and homes heating are a fire risk.`
+          ? "本任期不再有冬季"
+          : `距离冬季 ${clockText(s.season.left)}${severity(s.season.coming)}`
+      clock.innerHTML = `${icon(s.season.winter ? "winter" : "clock", 20)}<span class="stack"><b>${clockText(left)}</b><small class="${s.season.winter ? "winter" : s.season.coming === "hard" ? "down" : ""}">第 ${s.season.year} 年 · ${until}</small></span>`
+      clock.title = `${s.season.winter ? "冬季：农田停产，捕鱼减少，食物消耗加快" : "任期剩余时间"}\n年历：下个冬季为${s.season.coming === null ? "任期之外" : winters[s.season.coming].title}，再下个为${s.season.after === null ? "任期之外" : winters[s.season.after].title}。\n暖冬：捕鱼量 ${Math.round(winters.mild.fishing * 100)}%。普通冬季：${Math.round(winters.normal.fishing * 100)}%。严冬：时长增加50%，捕鱼量 ${Math.round(winters.hard.fishing * 100)}%，住宅取暖增加火灾风险。`
       const trend = s.mood.target > s.mood.approval ? "↑" : s.mood.target < s.mood.approval ? "↓" : ""
-      approval.innerHTML = `${icon("approval", 18)}<span class="stack"><b class="${s.mood.approval < 0 ? "down" : ""}">${signed(s.mood.approval)} <span class="${s.mood.target >= s.mood.approval ? "up" : "down"}">${trend}</span></b><small>approval</small></span>`
-      settlerCell.innerHTML = `${icon("settlers", 18)}<span class="stack"><b>${s.settlers}</b><small>settlers</small></span>`
-      citizenCell.innerHTML = `${icon("citizens", 18)}<span class="stack"><b>${s.citizens}</b><small>citizens${s.burghers > 0 ? ` · ${s.burghers} burghers` : ""}</small></span>`
+      approval.innerHTML = `${icon("approval", 18)}<span class="stack"><b class="${s.mood.approval < 0 ? "down" : ""}">${signed(s.mood.approval)} <span class="${s.mood.target >= s.mood.approval ? "up" : "down"}">${trend}</span></b><small>支持度</small></span>`
+      settlerCell.innerHTML = `${icon("settlers", 18)}<span class="stack"><b>${s.settlers}</b><small>移民</small></span>`
+      citizenCell.innerHTML = `${icon("citizens", 18)}<span class="stack"><b>${s.citizens}</b><small>市民${s.burghers > 0 ? ` · ${s.burghers} 富裕市民` : ""}</small></span>`
       const short = s.shortStaffed.length
-      jobs.innerHTML = `${icon("jobs", 18)}<span class="stack"><b>${s.employed}<span class="of">/${s.jobs}</span></b><small class="${short > 0 ? "down" : ""}">${short > 0 ? `${short} short · click` : "jobs filled"}</small></span>`
+      jobs.innerHTML = `${icon("jobs", 18)}<span class="stack"><b>${s.employed}<span class="of">/${s.jobs}</span></b><small class="${short > 0 ? "down" : ""}">${short > 0 ? `${short} 处缺人 · 点击定位` : "已就业"}</small></span>`
       jobs.title = short > 0
-        ? `Workers at work over workers needed. ${short} workplace${short > 1 ? "s are" : " is"} short: ${s.shortStaffed.slice(0, 5).map((w) => `${w.title} ${w.assigned}/${w.needed}${w.nobodyNear ? " (no homes within 15 road cells)" : ""}`).join(", ")}. Click to visit them in turn.`
-        : "Workers at work over workers needed: every workplace has its crew. Residents walk at most 15 road cells to work."
+        ? `已就业人数 / 所需人数。${short} 处工作场所缺人：${s.shortStaffed.slice(0, 5).map((w) => `${w.title} ${w.assigned}/${w.needed}${w.nobodyNear ? "（15格道路内无住宅）" : ""}`).join("、")}。点击逐一定位。`
+        : "已就业人数 / 所需人数：所有工作场所人手充足。居民最多步行15格道路上班。"
       for (const [g, count] of goodCells) {
         count.textContent = String(s.stock[g])
         count.parentElement!.classList.toggle("empty", s.stock[g] === 0)
@@ -1382,25 +1382,25 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
       request.classList.toggle("show", s.crown.open && s.fate.state === "playing")
       if (s.crown.open) {
         const have = s.stock[s.crown.good]
-        requestText.innerHTML = `${icon("crown", 18)}<span>the crown asks for <b>${s.crown.amount}</b> ${goodIcon(s.crown.good, 14)} <b>${goods[s.crown.good].title}</b> <span class="muted">(${have} in store)</span> · <b>${clockText(s.crown.left)}</b> · +${s.crown.reward} coins</span>`
+        requestText.innerHTML = `${icon("crown", 18)}<span>王室要求 <b>${s.crown.amount}</b> ${goodIcon(s.crown.good, 14)} <b>${goods[s.crown.good].title}</b> <span class="muted">（库存 ${have}）</span> · <b>${clockText(s.crown.left)}</b> · +${s.crown.reward} 金币</span>`
         send.disabled = have < s.crown.amount
       }
       // What threatens the term, or is about to complete it.
       const warnings: Array<string> = []
       if (s.fate.state === "playing") {
         if (s.fate.bankrupt !== null)
-          warnings.push(`<b>In debt:</b> bankrupt in ${clockText(s.fate.bankrupt)} unless the treasury recovers`)
-        else if (s.coins < 0) warnings.push("<b>In debt:</b> wages are going unpaid")
-        if (s.fate.revolt !== null) warnings.push(`<b>Uproar:</b> the town turns the mayor out in ${clockText(s.fate.revolt)}`)
-        else if (s.mood.approval < -30) warnings.push("<b>Restless:</b> approval is falling towards revolt")
-        if (s.fate.peak >= 40 && s.settlers + s.citizens < s.fate.peak * 0.4) warnings.push("<b>Emptying:</b> people are leaving the town")
+          warnings.push(`<b>负债：</b>若财政未改善，将在 ${clockText(s.fate.bankrupt)} 后破产`)
+        else if (s.coins < 0) warnings.push("<b>负债：</b>工资无法支付")
+        if (s.fate.revolt !== null) warnings.push(`<b>骚乱：</b>居民将在 ${clockText(s.fate.revolt)} 后驱逐市长`)
+        else if (s.mood.approval < -30) warnings.push("<b>不满：</b>支持度偏低，有骚乱风险")
+        if (s.fate.peak >= 40 && s.settlers + s.citizens < s.fate.peak * 0.4) warnings.push("<b>人口流失：</b>居民正在离开城镇")
         if (s.crown.streak > 0 && s.crown.streak >= s.crown.patience - 1) {
-          warnings.push(`<b>The crown's patience:</b> ${s.crown.streak} requests missed in a row; one more and the mayor is dismissed`)
+          warnings.push(`<b>王室耐心：</b>已连续 ${s.crown.streak} 次未交付；再有一次市长就会被撤换`)
         }
-        if (s.fate.complete !== null) warnings.push(`<b>Every goal met:</b> the town is complete in ${clockText(s.fate.complete)}`)
+        if (s.fate.complete !== null) warnings.push(`<b>所有目标已达成：</b>还有 ${clockText(s.fate.complete)} 即可完成建设`)
       }
       const html = warnings
-        .map((w) => `<div class="cell">${icon(w.startsWith("<b>Every goal") ? "goal" : "warning", 16)}<span>${w}</span></div>`)
+        .map((w) => `<div class="cell">${icon(w.startsWith("<b>所有目标") ? "goal" : "warning", 16)}<span>${w}</span></div>`)
         .join("")
       if (alarm.dataset.html !== html) {
         alarm.dataset.html = html
@@ -1413,13 +1413,13 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
       const news = s.chronicle.filter((l) => l.alarm && minute - l.tick < 90 * 60).slice(-3).reverse()
       const ago = (tick: number) => {
         const sec = Math.max(0, Math.round((minute - tick) / 60))
-        return sec < 5 ? "just now" : sec < 60 ? `${sec} s ago` : `${Math.round(sec / 60)} min ago`
+        return sec < 5 ? "刚刚" : sec < 60 ? `${sec} 秒前` : `${Math.round(sec / 60)} 分钟前`
       }
       const tickerHtml = [
-        ...(s.alerts.length > 0 ? [`<div class="head">now</div>`] : []),
-        ...s.alerts.map((a, i) => `<button class="cell${a.at ? " place" : ""}" data-alert="${i}" title="${a.at ? "Click to go there" : ""}">${icon("warning", 14)}<span>${a.text}</span>${a.at ? `<kbd>go</kbd>` : ""}</button>`),
-        ...(news.length > 0 ? [`<div class="head">lately</div>`] : []),
-        ...news.map((l, i) => `<button class="cell news${l.at ? " place" : ""}" data-news="${i}" title="${l.at ? "Click to go there" : ""}">${icon("chronicle", 14)}<span>${l.text} <em>${ago(l.tick)}</em></span>${l.at ? `<kbd>go</kbd>` : ""}</button>`)
+        ...(s.alerts.length > 0 ? [`<div class="head">当前提醒</div>`] : []),
+        ...s.alerts.map((a, i) => `<button class="cell${a.at ? " place" : ""}" data-alert="${i}" title="${a.at ? "点击定位" : ""}">${icon("warning", 14)}<span>${a.text}</span>${a.at ? `<kbd>定位</kbd>` : ""}</button>`),
+        ...(news.length > 0 ? [`<div class="head">最近动态</div>`] : []),
+        ...news.map((l, i) => `<button class="cell news${l.at ? " place" : ""}" data-news="${i}" title="${l.at ? "点击定位" : ""}">${icon("chronicle", 14)}<span>${l.text} <em>${ago(l.tick)}</em></span>${l.at ? `<kbd>定位</kbd>` : ""}</button>`)
       ].join("")
       if (ticker.dataset.html !== tickerHtml) {
         ticker.dataset.html = tickerHtml

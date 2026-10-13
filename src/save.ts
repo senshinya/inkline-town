@@ -71,15 +71,15 @@ export type LoadError = NothingSaved | Unreadable | WrongVersion | Rejected | St
 export const describe = (error: LoadError | StorageFailed): string => {
   switch (error._tag) {
     case "NothingSaved":
-      return error.slot === "auto" ? "No autosave yet" : "Nothing saved yet"
+      return error.slot === "auto" ? "尚无自动存档" : "尚无存档"
     case "Unreadable":
-      return "The save could not be read"
+      return "无法读取存档"
     case "WrongVersion":
-      return error.version < SAVE_VERSION ? "That save is from an older version of the game" : "That save is from a newer version of the game"
+      return error.version < SAVE_VERSION ? "该存档来自旧版游戏" : "该存档来自新版游戏"
     case "Rejected":
-      return `The save does not fit this game: ${error.reason}`
+      return `存档与当前游戏不兼容：${error.reason}`
     case "StorageFailed":
-      return `Could not save: ${error.reason}`
+      return `保存失败：${error.reason}`
   }
 }
 
@@ -149,7 +149,7 @@ export const read = (slot: Slot) =>
     const parsed = yield* decodeFile(raw).pipe(Effect.mapError((e) => new Unreadable({ slot, reason: e.message })))
     // The first charter saves were the world alone.
     if (typeof parsed === "object" && parsed !== null && "entities" in parsed && !("format" in parsed)) {
-      return { format: SAVE_FORMAT, version: SAVE_VERSION, slot, savedAt: 0, title: "an earlier save", world: parsed } satisfies SaveFile
+      return { format: SAVE_FORMAT, version: SAVE_VERSION, slot, savedAt: 0, title: "旧存档", world: parsed } satisfies SaveFile
     }
     const version = (parsed as { version?: unknown } | null)?.version
     if (typeof version === "number" && version !== SAVE_VERSION) {

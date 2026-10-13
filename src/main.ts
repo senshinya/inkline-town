@@ -21,7 +21,7 @@ const AUTOSAVE_MINUTES = 2
 
 const start = async () => {
   const mount = document.getElementById("app")!
-  let persistence: Persistence = { save: () => "Not ready", load: () => "Not ready" }
+  let persistence: Persistence = { save: () => "尚未就绪", load: () => "尚未就绪" }
   const { stage, ui, syncPage, resetPage } = await createHost(mount, () => persistence)
   const clock = { deltaSeconds: STEP_SECONDS, elapsed: 0 }
 
@@ -54,7 +54,7 @@ const start = async () => {
     resources: blankResources()
   })
   if (!made.ok) {
-    mount.textContent = `The town could not start: ${JSON.stringify(made.error)}`
+    mount.textContent = `城镇启动失败：${JSON.stringify(made.error)}`
     return
   }
   const runtime = made.value
@@ -79,8 +79,8 @@ const start = async () => {
     title: () => {
       const s = ui.stats
       return s
-        ? `${sizes[s.charter.size].title}, ${lands[s.charter.land].title} land · year ${s.season.year} · ${Math.floor(s.minute)} min in`
-        : "a town"
+        ? `${sizes[s.charter.size].title}地图，资源${lands[s.charter.land].title} · 第 ${s.season.year} 年 · 已进行 ${Math.floor(s.minute)} 分钟`
+        : "一座城镇"
     }
   }
   const run = <A, E>(program: Effect.Effect<A, E, Storage | World>) =>
@@ -95,7 +95,7 @@ const start = async () => {
     load: () => {
       const loaded = run(loadLatest)
       if (loaded._tag === "Failure") return describe(loaded.failure)
-      return loaded.success.slot === "auto" ? `Loaded the autosave: ${loaded.success.title}` : `Loaded ${loaded.success.title}`
+      return loaded.success.slot === "auto" ? `已读取自动存档：${loaded.success.title}` : `已读取：${loaded.success.title}`
     }
   }
   /** The page autosaves every `AUTOSAVE_MINUTES` of game time while a term runs. */
@@ -135,16 +135,16 @@ const start = async () => {
       clock.deltaSeconds = elapsedSeconds
       clock.elapsed += elapsedSeconds
       const shown = runtime.tick(present)
-      if (!shown.ok) throw new Error(`The town view stopped: ${JSON.stringify(shown.error)}`)
+      if (!shown.ok) throw new Error(`城镇画面停止运行：${JSON.stringify(shown.error)}`)
       syncPage()
       autosave()
     },
     onFailure: (failure) => {
       mount.textContent =
-        failure.kind === "InvalidTickDelta" ? `Invalid frame delta: ${failure.deltaMS}` : "The town stopped after a system failure."
+        failure.kind === "InvalidTickDelta" ? `无效的帧间隔：${failure.deltaMS}` : "系统发生错误，城镇已停止运行。"
     }
   })
-  if (!loop.ok) mount.textContent = `Invalid fixed-loop option: ${loop.error.field}`
+  if (!loop.ok) mount.textContent = `无效的固定循环选项：${loop.error.field}`
 }
 
 void start()

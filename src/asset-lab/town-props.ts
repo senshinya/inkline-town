@@ -104,7 +104,7 @@ const gravel = 0xece4d3
  * furnishing. `roads` lets a walk run out to the street.
  */
 export function parkAsset(cells: ReadonlyMap<number, ParkCell>, roads: ReadonlySet<number> = new Set(), preview = false) {
-  const d = new Drawing("parks", "Parks", "")
+  const d = new Drawing("parks", "公园", "")
   const z = preview ? 0.17 : -0.12
   const isPark = (x: number, y: number) => cells.has(key(x, y))
   const walk = (x: number, y: number) => {
@@ -170,8 +170,8 @@ export function makeParkProp(prop: PropId) {
   asset.strokes.forEach((s) => { s.points = s.points.map(shift) })
   asset.fountains?.forEach(f=>{f.origin=shift(f.origin)})
   asset.id = `park-${prop}`
-  asset.title = `Park · ${props[prop].title.toLowerCase()}`
-  asset.note = prop==="statue"?"A simple stone bust on a plain pedestal, readable at the town's scale.":prop==="fountain"?"A stone basin with running water and soft surface ripples.":props[prop].blurb
+  asset.title = `公园 · ${props[prop].title.toLowerCase()}`
+  asset.note = prop==="statue"?"朴素基座上的石制半身像，在游戏尺寸下仍清晰可辨。":prop==="fountain"?"石制水池、流动水流与柔和水面涟漪。":props[prop].blurb
   asset.category = "land"
   asset.reference = { type: "none" }
   asset.footprint = 1
@@ -203,8 +203,8 @@ export function makeSamplePark() {
   asset.strokes.forEach((s) => { s.points = s.points.map(shift) })
   asset.fountains?.forEach(f=>{f.origin=shift(f.origin)})
   asset.id = "park-sample"
-  asset.title = "Park · laid out"
-  asset.note = "A five-by-five park built piece by piece: lawn, a cross of walks, flower beds in the corners, lamps, a fountain, and a statue on paved squares."
+  asset.title = "公园 · 完整布局"
+  asset.note = "逐格建造的五乘五公园：草坪、十字小径、角落花坛、路灯、喷泉，以及石铺广场上的雕像。"
   asset.category = "land"
   asset.reference = { type: "none" }
   asset.footprint = 5
@@ -213,7 +213,7 @@ export function makeSamplePark() {
 
 /** What is left of a home or building: charred, tumbled down, or boarded up. */
 export function makeRuin(size: number, cause: "burnt" | "collapsed" | "derelict") {
-  const d = new Drawing(`ruin-${cause}-${size}`, `Ruin · ${cause}`, "Exposed masonry, fallen rafters, roof tiles and weeds; each cause leaves a different silhouette.")
+  const d = new Drawing(`ruin-${cause}-${size}`, `废墟 · ${{ burnt: "烧毁", collapsed: "坍塌", derelict: "荒废" }[cause]}`, "裸露砖石、倒塌椽木、屋瓦与杂草；不同毁坏原因留下不同轮廓。")
   d.asset.category = "construction"
   d.asset.reference = { type: "none" }
   d.asset.footprint = size

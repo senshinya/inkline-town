@@ -8,24 +8,24 @@ import { StructureEffects } from "../render3d/structure-effects.ts"
 import "./style.css"
 
 const cases: Array<{title:string;note:string;state:Partial<SurfaceState>}>=[
-  {title:"Sound house",note:"The original house, without an effect.",state:{}},
-  {title:"Cared for",note:"Fresh plaster and warm window light.",state:{care:1}},
-  {title:"Neglected",note:"Stained plaster, exposed brick, cracks and roof moss.",state:{wear:0.95}},
-  {title:"Fire warning",note:"Smoke escapes from the roof; heat colours the eaves.",state:{fireRisk:1,wear:0.2}},
-  {title:"Sickness",note:"Damp green stains and unhealthy window light.",state:{health:1,sick:1,wear:0.3}},
-  {title:"Unrest",note:"Fractures in the actual glazing; darkened windows.",state:{order:1,wear:0.3}},
-  {title:"Winter",note:"Snow covers the existing roof surfaces.",state:{snow:1}},
-  {title:"Burning",note:"Roof fire, rising smoke, embers, soot and flickering windows.",state:{burning:1,wear:0.4}}
+  {title:"完好住宅",note:"原始住宅，无特效。",state:{}},
+  {title:"维护良好",note:"整洁墙面与温暖窗光。",state:{care:1}},
+  {title:"疏于维护",note:"污渍墙面、裸露砖块、裂缝与屋顶青苔。",state:{wear:0.95}},
+  {title:"火灾预警",note:"烟雾从屋顶逸出，热光映红屋檐。",state:{fireRisk:1,wear:0.2}},
+  {title:"疾病",note:"潮湿的绿色污迹与病态窗光。",state:{health:1,sick:1,wear:0.3}},
+  {title:"治安不稳",note:"玻璃裂纹与暗淡窗户。",state:{order:1,wear:0.3}},
+  {title:"冬季",note:"积雪覆盖原有屋顶表面。",state:{snow:1}},
+  {title:"燃烧中",note:"屋顶火焰、升腾烟雾、余烬、烟灰与闪烁窗光。",state:{burning:1,wear:0.4}}
 ]
 const root=document.querySelector<HTMLElement>("#effects-lab")!
-root.innerHTML=`<header><a href="/model-review.html">Inkline Town</a><span>LIVE MATERIAL & PARTICLE STUDY</span><a href="/">Play the town ↗</a></header><section class="intro"><h1>One house.<br>Eight conditions.</h1><p>These are actual renders of the shared game mesh. Surface shaders change its condition; particles emit from its roof. Drag to turn the view.</p></section><section class="controls"><label>House <select aria-label="House tier"><option value="1">Settler cottage</option><option value="2" selected>Citizen home</option><option value="3">Townhouse</option></select></label><label>Rotation <input aria-label="Rotation" id="rotation" type="range" min="-180" max="180" value="0"><output id="angle">0°</output></label><label>Effect strength <input aria-label="Effect strength" id="strength" type="range" min="0" max="100" value="100"><output id="amount">100%</output></label><button id="pause">Pause animation</button><button id="rear">See the back</button></section><section class="grid" aria-label="House effects"></section><footer><span id="stats"></span><span>Same mesh · Surface shaders · Roof particles · Drag to rotate</span></footer>`
+root.innerHTML=`<header><a href="/model-review.html">墨线小镇</a><span>动态材质与粒子展示</span><a href="/">进入游戏 ↗</a></header><section class="intro"><h1>一栋住宅。<br>八种状态。</h1><p>使用游戏中的住宅模型实时渲染，通过表面着色器改变外观，从屋顶发射粒子。拖动可旋转视角。</p></section><section class="controls"><label>住宅 <select aria-label="住宅等级"><option value="1">移民小屋</option><option value="2" selected>市民住宅</option><option value="3">市民宅邸</option></select></label><label>旋转 <input aria-label="旋转" id="rotation" type="range" min="-180" max="180" value="0"><output id="angle">0°</output></label><label>特效强度 <input aria-label="特效强度" id="strength" type="range" min="0" max="100" value="100"><output id="amount">100%</output></label><button id="pause">暂停动画</button><button id="rear">查看背面</button></section><section class="grid" aria-label="住宅特效"></section><footer><span id="stats"></span><span>共用模型 · 表面着色器 · 屋顶粒子 · 拖动旋转</span></footer>`
 const grid=root.querySelector<HTMLElement>(".grid")!, renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,preserveDrawingBuffer:true}),scene=new THREE.Scene(),pool=new ModelPool(),camera=new THREE.OrthographicCamera(-100,100,100,-100,0.1,4000)
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.setClearColor(0xf0f2ec,0)
 renderer.domElement.className="rendering";document.body.append(renderer.domElement);scene.add(pool.root)
 const views=cases.map((c,i)=>{
   const card=document.createElement("article")
   card.innerHTML=`<div class="render-view" role="img" aria-label="${c.title}"></div><div class="caption"><h2>${c.title}</h2><p>${c.note}</p></div>`;grid.append(card)
-  if(i===7){const b=document.createElement("button");b.textContent="Fire close-up";card.querySelector(".caption")!.append(b);b.onclick=()=>{card.classList.toggle("close-up");b.textContent=card.classList.contains("close-up")?"Back to overview":"Fire close-up";card.scrollIntoView({block:"start"})}}
+  if(i===7){const b=document.createElement("button");b.textContent="火灾特写";card.querySelector(".caption")!.append(b);b.onclick=()=>{card.classList.toggle("close-up");b.textContent=card.classList.contains("close-up")?"返回总览":"火灾特写";card.scrollIntoView({block:"start"})}}
   const handle=new ModelHandle(pool),anchor=new THREE.Group();anchor.position.x=i*200;anchor.add(handle.root);scene.add(anchor)
   return{card,handle,anchor,effects:null as StructureEffects|null,view:card.querySelector<HTMLElement>(".render-view")!}
 })
@@ -59,7 +59,7 @@ function render(){
     renderer.setScissor(Math.max(0,r.left),Math.max(0,innerHeight-r.bottom),Math.min(innerWidth,r.right)-Math.max(0,r.left),Math.min(innerHeight,r.bottom)-Math.max(0,r.top))
     renderer.render(scene,camera)
   })
-  root.querySelector("#stats")!.textContent=`1 active house mesh · ${views.length} instances · ${time.toFixed(1)} s`
+  root.querySelector("#stats")!.textContent=`1 个住宅模型 · ${views.length} 个实例 · ${time.toFixed(1)} 秒`
   frame++
 }
 /** Captures the same GPU scene at a reproducible animation time. */
@@ -67,8 +67,8 @@ function capture(t=time,focus=false){
   update(t)
   const canvas=document.createElement("canvas"),ctx=canvas.getContext("2d")!,width=focus?960:320,height=focus?600:300,viewHeight=focus?520:230
   canvas.width=960;canvas.height=focus?680:1000;ctx.fillStyle="#f0f2ec";ctx.fillRect(0,0,canvas.width,canvas.height)
-  ctx.fillStyle="#3d4943";ctx.font="30px Georgia";ctx.fillText("Inkline Town / effects on one house",24,40)
-  ctx.font="12px monospace";ctx.fillText(`${home.tiers[tier].title} · shared mesh · ${t.toFixed(2)} s`,24,65)
+  ctx.fillStyle="#3d4943";ctx.font="30px Georgia";ctx.fillText("墨线小镇 / 住宅特效",24,40)
+  ctx.font="12px monospace";ctx.fillText(`${home.tiers[tier].title} · 共用模型 · ${t.toFixed(2)} 秒`,24,65)
   renderer.setPixelRatio(1);renderer.setSize(width,viewHeight,false);renderer.setScissorTest(false)
   const indices=focus?[7]:views.map((_,i)=>i)
   indices.forEach((i,index)=>{
@@ -81,7 +81,7 @@ function capture(t=time,focus=false){
 root.querySelector<HTMLSelectElement>("select")!.onchange=e=>{tier=Number((e.target as HTMLSelectElement).value) as Tier;build();update(time);render()}
 root.querySelector<HTMLInputElement>("#rotation")!.oninput=e=>{yaw=Number((e.target as HTMLInputElement).value);root.querySelector("#angle")!.textContent=`${yaw}°`;render()}
 root.querySelector<HTMLInputElement>("#strength")!.oninput=e=>{strength=Number((e.target as HTMLInputElement).value)/100;root.querySelector("#amount")!.textContent=`${Math.round(strength*100)}%`;update(time);render()}
-root.querySelector<HTMLButtonElement>("#pause")!.onclick=e=>{paused=!paused;(e.target as HTMLButtonElement).textContent=paused?"Resume animation":"Pause animation"}
+root.querySelector<HTMLButtonElement>("#pause")!.onclick=e=>{paused=!paused;(e.target as HTMLButtonElement).textContent=paused?"恢复动画":"暂停动画"}
 root.querySelector<HTMLButtonElement>("#rear")!.onclick=()=>{yaw=yaw===180?0:180;root.querySelector<HTMLInputElement>("#rotation")!.value=String(yaw);root.querySelector("#angle")!.textContent=`${yaw}°`;render()}
 let drag:{x:number;yaw:number}|null=null
 grid.onpointerdown=e=>{if(!(e.target as HTMLElement).classList.contains("render-view"))return;drag={x:e.clientX,yaw};grid.setPointerCapture(e.pointerId)}

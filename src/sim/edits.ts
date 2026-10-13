@@ -72,8 +72,8 @@ export const ApplyEdits = Game.System(
     const left: Record<string, number> = { ...resources.stock.get() }
 
     const afford = (cost: Kind["cost"]): string | null => {
-      if (coins < cost.coins) return "Not enough coins"
-      for (const [g, n] of Object.entries(cost.materials)) if ((left[g] ?? 0) < (n ?? 0)) return `Not enough ${g}`
+      if (coins < cost.coins) return "金币不足"
+      for (const [g, n] of Object.entries(cost.materials)) if ((left[g] ?? 0) < (n ?? 0)) return `${goods[g as keyof typeof goods].title}不足`
       return null
     }
     const pay = (cost: Kind["cost"]) => {
@@ -124,7 +124,7 @@ export const ApplyEdits = Game.System(
             break
           }
           if (!canPlace(grid.value(), tile)) {
-            ui.toast("No room there")
+            ui.toast("此处空间不足")
             break
           }
           const short = afford(kind.cost)
@@ -164,7 +164,7 @@ export const ApplyEdits = Game.System(
             coins -= ROAD_COST
             spawn(roadDraft(cell), tile, "road")
           }
-          if (short) ui.toast("Not enough coins")
+          if (short) ui.toast("金币不足")
           break
         }
         case "pave": {
@@ -219,7 +219,7 @@ export const ApplyEdits = Game.System(
             ? queries.parks.each().find((r) => r.entity.id === ownerAt(grid.value(), edit.cell.x, edit.cell.y))
             : undefined
           if (!row) {
-            ui.toast("Lay park ground first")
+            ui.toast("请先铺设公园地面")
             break
           }
           if (row.data.park.get().prop === edit.prop) break
@@ -239,7 +239,7 @@ export const ApplyEdits = Game.System(
           const owner = entities.get(ownerAt(grid.value(), edit.cell.x, edit.cell.y))
           if (owner === undefined || use === "rock" || use === "water") break
           if (halls.has(owner)) {
-            ui.toast("The town hall stays")
+            ui.toast("市政厅不可拆除")
             break
           }
           // A park's furnishing goes before its ground.
@@ -282,7 +282,7 @@ export const ApplyEdits = Game.System(
           const c = resources.crown.get()
           if (!c.open) break
           if ((left[c.good] ?? 0) < c.amount) {
-            ui.toast(`Not enough ${goods[c.good].title}`)
+            ui.toast(`${goods[c.good].title}不足`)
             break
           }
           let owed = c.amount
@@ -296,15 +296,15 @@ export const ApplyEdits = Game.System(
           left[c.good] = (left[c.good] ?? 0) - c.amount
           coins += c.reward
           resources.crown.set({ ...c, open: false, met: c.met + 1, streak: 0 })
-          write(resources.chronicle, t, `Sent the crown ${c.amount} ${goods[c.good].title}, for ${c.reward} coins.`)
-          ui.toast(`Sent · +${c.reward} coins`)
+          write(resources.chronicle, t, `已向王室交付 ${c.amount} ${goods[c.good].title}，获得 ${c.reward} 金币。`)
+          ui.toast(`已交付 · +${c.reward} 金币`)
           break
         }
         case "govern": {
           const f = resources.fate.get()
           if (f.state !== "won") break
           resources.fate.set({ ...f, state: "playing", governing: true, won: f.at, reason: "" })
-          write(resources.chronicle, t, "The mayor stays on to govern the town to the end of the term.")
+          write(resources.chronicle, t, "市长决定继续执政至任期结束。")
           break
         }
         case "reserve":
@@ -342,7 +342,7 @@ export const ApplyEdits = Game.System(
           resources.fate.set(foundedFate())
           resources.history.set({ samples: [] })
           resources.chronicle.set({
-            lines: [{ tick: 0, text: `Founded on ${sizes[charter.size].title}, ${richness.title} land, for a term of ${charter.term} minutes.`, alarm: false, at: null }]
+            lines: [{ tick: 0, text: `城镇建立于${sizes[charter.size].title}地图，资源${richness.title}，任期 ${charter.term} 分钟。`, alarm: false, at: null }]
           })
           resources.rng.set(charter.seed)
           ui.selected = null

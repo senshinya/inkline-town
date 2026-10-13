@@ -218,13 +218,13 @@ const represented = new Set(buildings.map((p) => p.asset))
 const missing = inkAssets.filter((a) => !represented.has(a.id)).map((a) => a.id)
 if (missing.length) throw new Error(`Review map is missing: ${missing.join(", ")}`)
 export const districts = {
-  all: { title: "Whole island", x: 0, y: 0, zoom: 1 },
-  town: { title: "Town centre", x: 2, y: -5, zoom: 2.8 },
-  industry: { title: "Workshops", x: -7, y: 1, zoom: 3.2 },
-  homes: { title: "Homes", x: -4, y: 7, zoom: 5 },
-  people: { title: "People", x: 0, y: -2, zoom: 7 },
-  cargo: { title: "Cargo yard", x: 7, y: 7, zoom: 4 },
-  forest: { title: "Forest & farms", x: -10, y: -11, zoom: 3.2 },
-  variants: { title: "Winter & wear", x: -2, y: 21, zoom: 2.3 }
+  all: { title: "整座岛屿", x: 0, y: 0, zoom: 1 },
+  town: { title: "城镇中心", x: 2, y: -5, zoom: 2.8 },
+  industry: { title: "工坊", x: -7, y: 1, zoom: 3.2 },
+  homes: { title: "住宅", x: -4, y: 7, zoom: 5 },
+  people: { title: "人物", x: 0, y: -2, zoom: 7 },
+  cargo: { title: "货场", x: 7, y: 7, zoom: 4 },
+  forest: { title: "森林与农场", x: -10, y: -11, zoom: 3.2 },
+  variants: { title: "冬季与磨损", x: -2, y: 21, zoom: 2.3 }
 } as const
 export const testMap = { asset: town, buildings, effects, trees: trees.length + 18, roads: roads.size, coverage: represented.size }
