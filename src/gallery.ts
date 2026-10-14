@@ -121,7 +121,8 @@ const iconTitles: Readonly<Record<string, string>> = {
   select: "选择", road: "道路", homes: "住宅", build: "建造", bulldoze: "拆除", town: "城镇",
   pause: "暂停", play: "继续", save: "保存", load: "读取", newTown: "新城镇", close: "关闭", info: "说明",
   upkeep: "维护费", burghers: "富裕市民", decor: "公园", pave: "铺石", fire: "火灾", health: "健康",
-  order: "治安", repair: "修缮", appeal: "宜居度", condition: "建筑状况", view: "地图视图", workers: "劳动力"
+  order: "治安", repair: "修缮", appeal: "宜居度", condition: "建筑状况", view: "地图视图", workers: "劳动力",
+  more: "更多操作", layers: "地图图层", share: "分享", picture: "图片", link: "链接", hint: "提示", locate: "定位", caution: "注意"
 }
 for (const name of iconNames) {
   const cell = document.createElement("div")
