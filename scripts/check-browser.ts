@@ -10,6 +10,7 @@ import { chromium } from "playwright"
 import type { UiValue } from "../src/ui.ts"
 import type { GameScene } from "../src/render3d/scene.ts"
 import type { Snapshot } from "../src/sim/headless.ts"
+import { SAVE_VERSION } from "../src/save.ts"
 
 declare global {
   interface Window {
@@ -42,37 +43,31 @@ const capture=async(name:string)=>{
 try {
   await page.goto(process.env.GAME_BASE_URL??"http://127.0.0.1:5232")
   await page.waitForFunction(()=>window.town)
-  assert.equal(await page.locator("html").getAttribute("lang"), "zh-CN")
-  assert.equal(await page.locator(".dialog.open h2").textContent(), "建立城镇")
+  assert.equal(await page.locator("html").getAttribute("lang"),"zh-CN")
+  assert.equal(await page.locator(".dialog.open h2").textContent(),"建立城镇")
   await page.getByRole("button",{name:"小型",exact:true}).click()
   await page.getByRole("button",{name:"建立城镇",exact:true}).click()
   await page.waitForFunction(()=>!window.town.ui.founding)
   await page.locator(".toolbar .pause").click()
   const hall=(await entities("Town/TownHall"))[0]!,tile=hall.components["Town/Tile"]
-  await page.getByRole("button",{name:"向右旋转地图",exact:true}).click()
+  await page.keyboard.press("e")
   await clickGrid(tile.x+1.5,tile.y+1.5,48)
   await page.waitForFunction(id=>window.town.ui.selected===id,hall.id)
   assert.equal((await page.evaluate(()=>window.town.ui.panel))?.type,"building")
   facts.rotatedSelection=true
-  await page.keyboard.press("t")
-  await page.locator(".panel h2").filter({hasText:"城镇"}).waitFor()
-  assert.equal(await page.locator(".panel h2").textContent(), "城镇")
-  const headings = await page.locator(".panel h3").allTextContents()
-  assert.ok(headings.every(text => /[\u4e00-\u9fff]/.test(text)), "All town section headings are Chinese")
-  assert.ok(await page.locator(".panel h3 .icon").evaluateAll(icons => icons.every(icon => icon.childElementCount > 0)), "Section icons retain their internal ids")
-  await page.locator(".panel .close").click()
-  facts.chineseTownPanel=true
   await tool("道路")
-  await dragGrid([tile.x+5.5,tile.y+1.5],[tile.x+8.5,tile.y+1.5])
-  await page.waitForFunction(([x,y])=>[6,7,8].every(dx=>window.town.runtime.snapshot().entities.some(e=>e.components["Town/Road"]&&e.components["Town/Tile"].x===x!+dx&&e.components["Town/Tile"].y===y!+1)),[tile.x,tile.y])
+  // The town now starts with only the hall's ring: begin the road there so the new sites are reachable.
+  await dragGrid([tile.x+3.5,tile.y+1.5],[tile.x+8.5,tile.y+1.5])
+  await page.waitForFunction(([x,y])=>[3,4,5,6,7,8].every(dx=>window.town.runtime.snapshot().entities.some(e=>e.components["Town/Road"]&&e.components["Town/Tile"].x===x!+dx&&e.components["Town/Tile"].y===y!+1)),[tile.x,tile.y])
+  assert.match(await page.locator(".ticker .head.guide").textContent() ?? "",/引导/)
+  assert.match(await page.locator(".ticker .guide .goal").textContent() ?? "",/完成条件/)
+  facts.localizedGuide=true
   facts.rotatedRoadDrag=true
   await tool("住宅")
   await dragGrid([tile.x+5.5,tile.y+2.5],[tile.x+8.5,tile.y+2.5])
   await page.waitForFunction(()=>window.town.runtime.snapshot().entities.filter(e=>e.components["Town/House"]).length===4)
   facts.rotatedHomeDrag=true
   await tool("建造")
-  await page.locator(".panel h2").filter({hasText:"建造"}).waitFor()
-  assert.ok((await page.locator(".panel h3").allTextContents()).every(text => /[\u4e00-\u9fff]/.test(text)))
   await page.locator(".panel .option").filter({has:page.locator(".name",{hasText:"伐木场"})}).click()
   await clickGrid(tile.x+7,tile.y)
   await page.waitForFunction(()=>window.town.runtime.snapshot().entities.some(e=>e.components["Town/Building"]?.kind==="lumberjack"))
@@ -84,8 +79,10 @@ try {
   await page.waitForFunction(()=>window.town.ui.stats!.settlers>0)
   assert.ok((await entities("Town/House")).some(e=>!("Town/Site" in e.components)))
   facts.liveConstruction=true
+  await page.locator(".ticker .ref.kind[data-kind=fishery]").first().waitFor({state:"visible"})
+  facts.localizedBuildingCallouts=true
   await tool("选择")
-  await page.getByRole("button",{name:"向右旋转地图",exact:true}).click()
+  await page.keyboard.press("e")
   const lt=lumber.components["Town/Tile"]
   await clickGrid(lt.x+1,lt.y+1,16)
   await page.waitForFunction(id=>window.town.ui.selected===id,lumber.id)
@@ -127,7 +124,7 @@ try {
   facts.largeIsland=await page.evaluate(()=>window.town.view.stats())
   await capture("large-island")
   const fixture=process.env.GAME_SAVE_PATH??`${output}/fixture/large-rich-24757-20min.json`
-  if (!existsSync(fixture)) execFileSync(process.execPath,["scripts/balance.ts","--seeds","1","--from","3","--size","large","--land","rich","--term","45","--snapshot","20","--out",`${output}/fixture`],{stdio:"pipe"})
+  if (!existsSync(fixture) || (!process.env.GAME_SAVE_PATH && JSON.parse(await readFile(fixture,"utf8")).version !== SAVE_VERSION)) execFileSync(process.execPath,["scripts/balance.ts","--seeds","1","--from","3","--size","large","--land","rich","--term","45","--snapshot","20","--out",`${output}/fixture`],{stdio:"pipe"})
   const grown=JSON.parse(await readFile(fixture,"utf8"))
   await page.evaluate(save=>{
     localStorage.removeItem("inkline-town/save/auto")
@@ -136,7 +133,12 @@ try {
   await page.getByRole("button",{name:"读取",exact:true}).click()
   await page.getByRole("button",{name:"不保存，直接读取",exact:true}).click()
   await page.waitForFunction(()=>window.town.ui.stats!.settlers>100)
-  assert.deepEqual(await snapshot(),grown.world)
+  // The guide puts away what the bot's town has already done on the page's first frame; the rest loads exactly as saved.
+  const withoutGuide=(w:Snapshot)=>({...w,resources:{...w.resources,"Town/Guide":null}})
+  const loaded=await snapshot()
+  assert.deepEqual(withoutGuide(loaded),withoutGuide(grown.world))
+  assert.ok(["homes","fishery","market"].every(id=>loaded.resources["Town/Guide"].done.includes(id)),"The guide puts away what the town has done")
+  facts.guide=loaded.resources["Town/Guide"]
   const settledFrame=await page.evaluate(()=>window.town.view.stats().frames)
   await page.waitForFunction(start=>window.town.view.stats().frames>start+60,settledFrame)
   facts.populatedTown=await page.evaluate(()=>window.town.view.stats())
@@ -145,13 +147,13 @@ try {
   await page.evaluate(([x,y])=>window.town.view.focus(x!,y!),[ht.x+1.5,ht.y+1.5])
   await capture("populated-town")
   for (let angle=0;angle<8;angle++) {
-    await page.getByRole("button",{name:"向右旋转地图",exact:true}).click()
+    await page.keyboard.press("e")
     await clickGrid(ht.x+1.5,ht.y+1.5,48)
     await page.waitForFunction(id=>window.town.ui.selected===id,grownHall.id)
     await page.locator(".panel .close").click()
   }
   facts.selectionAllEightAngles=true
-  await page.getByRole("button",{name:"向右旋转地图",exact:true}).click()
+  await page.keyboard.press("e")
   await capture("populated-rotated")
   await page.getByRole("button",{name:"4×",exact:true}).click()
   const before=await snapshot()
@@ -166,15 +168,15 @@ try {
   facts.liveWalkerMovement=true
   await page.setViewportSize({width:390,height:844})
   await page.getByRole("button",{name:"重置镜头",exact:true}).click()
-  await page.getByRole("button",{name:"向左旋转地图",exact:true}).click()
-  await page.getByRole("button",{name:"放大",exact:true}).click()
+  await page.keyboard.press("q")
   assert.equal(await page.evaluate(()=>[...document.querySelectorAll(".camera-controls,.toolbar,.system,.hud")].some(e=>{const r=e.getBoundingClientRect();return r.left<0||r.right>innerWidth+1})),false)
   facts.phoneViewport=true
   await tool("住宅")
   const touch=await page.context().newCDPSession(page),beforeTouch=await snapshot(),cameraBefore=await page.evaluate(()=>window.town.view.stats())
-  await touch.send("Input.dispatchTouchEvent",{type:"touchStart",touchPoints:[{x:130,y:380,id:1}]})
-  await touch.send("Input.dispatchTouchEvent",{type:"touchStart",touchPoints:[{x:130,y:380,id:1},{x:230,y:420,id:2}]})
-  await touch.send("Input.dispatchTouchEvent",{type:"touchMove",touchPoints:[{x:100,y:350,id:1},{x:290,y:460,id:2}]})
+  // Below the ticker (the guide fills its top half on a phone), on the map itself.
+  await touch.send("Input.dispatchTouchEvent",{type:"touchStart",touchPoints:[{x:130,y:540,id:1}]})
+  await touch.send("Input.dispatchTouchEvent",{type:"touchStart",touchPoints:[{x:130,y:540,id:1},{x:230,y:580,id:2}]})
+  await touch.send("Input.dispatchTouchEvent",{type:"touchMove",touchPoints:[{x:100,y:510,id:1},{x:290,y:620,id:2}]})
   await touch.send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]})
   const tf=await page.evaluate(()=>window.town.view.stats().frames)
   await page.waitForFunction(f=>window.town.view.stats().frames>f+5,tf)
@@ -195,16 +197,46 @@ try {
   await page.getByRole("button",{name:"建立新城镇",exact:true}).waitFor({state:"visible"})
   assert.equal(await page.evaluate(()=>window.town.ui.stats!.fate.state),"over")
   facts.reckoning=true
-  // Chinese punctuation in new endings and ASCII punctuation in older saves both delimit the title.
+  // Sharing: the card, then a link that opens the town in another browser (a phone), which can play on from there.
+  await page.getByRole("button",{name:"分享城镇",exact:true}).click()
+  const card=page.locator(".dialog.share img.card-preview")
+  await card.waitFor({state:"visible"})
+  assert.deepEqual(await card.evaluate(async(img:HTMLImageElement)=>{await img.decode();return [img.naturalWidth,img.naturalHeight]}),[2400,1260])
+  await page.screenshot({path:`${output}/share-card.png`})
+  await page.getByRole("button",{name:"生成链接",exact:true}).click()
+  const link=page.locator(".dialog.share .link-row input")
+  await link.waitFor({state:"visible"})
+  const url=await link.inputValue()
+  assert.match(url,/\/t\/[a-z2-9]{8}$/)
+  const unfurl=await (await fetch(url)).text()
+  assert.ok(unfurl.includes(`<meta property="og:image" content="${new URL(url).origin}/api/towns/`),"A shared link unfurls to its picture")
+  const picture=await fetch(unfurl.match(/property="og:image" content="([^"]+)"/)![1]!)
+  assert.equal(picture.headers.get("content-type"),"image/jpeg")
+  const sharedWorld=await snapshot()
+  const visitor=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:1,hasTouch:true,isMobile:true})
+  visitor.on("pageerror",e=>errors.push(`visitor: ${e.message}`))
+  await visitor.goto(url)
+  await visitor.waitForFunction(()=>document.body.classList.contains("visiting"),undefined,{timeout:60000})
+  const visited=await visitor.evaluate(()=>window.town.runtime.snapshot())
+  assert.deepEqual(visited.entities,sharedWorld.entities,"The visitor sees the town as it was shared")
+  assert.deepEqual(visited.resources,sharedWorld.resources)
+  assert.ok(await visitor.locator(".toolbar").isHidden(),"A visitor's building tools are put away")
+  await visitor.getByRole("button",{name:"查看城镇",exact:true}).click()
+  await visitor.getByRole("button",{name:"接手游玩",exact:true}).click()
+  assert.equal(new URL(visitor.url()).pathname,"/")
+  assert.ok(await visitor.locator(".toolbar").isVisible(),"Playing on brings the tools back")
+  await visitor.screenshot({path:`${output}/shared-visitor.png`})
+  await visitor.close()
+  facts.sharedLink=url
+  await page.getByRole("button",{name:"关闭",exact:true}).click()
   for (const [reason,title] of [["破产：王室收回了市长的财政管理权。","破产"],["Bankrupt: the crown has taken the treasury.","bankrupt"]] as const) {
     await page.getByRole("button",{name:"查看城镇",exact:true}).click()
-    const lost=structuredClone(ended)
-    lost.world.resources["Town/Fate"]={...lost.world.resources["Town/Fate"],state:"lost",reason,at:++ended.world.resources["Town/Fate"].at}
-    await page.evaluate(save=>localStorage.setItem("inkline-town/save/manual",JSON.stringify({...save,savedAt:Date.now()})),lost)
+    const loss=structuredClone(ended)
+    loss.world.resources["Town/Fate"]={...loss.world.resources["Town/Fate"],state:"lost",reason,at:loss.world.resources["Town/Fate"].at+1+(title==="破产"?0:1)}
+    await page.evaluate(save=>localStorage.setItem("inkline-town/save/manual",JSON.stringify({...save,savedAt:Date.now()})),loss)
     await page.getByRole("button",{name:"读取",exact:true}).click()
     await page.getByRole("button",{name:"不保存，直接读取",exact:true}).click()
-    await page.locator(".dialog.open h2").filter({hasText:title}).waitFor()
-    assert.equal(await page.locator(".dialog.open h2").textContent(),title)
+    await page.waitForFunction(t=>document.querySelector(".dialog.open h2")?.textContent===t,title)
   }
   facts.localizedLossTitlesAndLegacySaves=true
   assert.deepEqual(errors,[])

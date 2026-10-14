@@ -203,14 +203,16 @@ export const Census = Descriptor.ConstructedResource(Decode.struct({
 }))("Town/Census")
 /**
  * The town's tax rates (in percent of the usual, for each tier), what it
- * sells to traders beyond the reserve it keeps, and what it buys up to it.
+ * sells to traders beyond the reserve it keeps, and what it buys up to it;
+ * `loads` is how much of each good may change hands at a collection.
  */
 export const Policy = Descriptor.ConstructedResource(Decode.struct({
   settlers: integer,
   citizens: integer,
   sells: Decode.array(good),
   buys: Decode.array(good),
-  reserve: integer
+  reserve: integer,
+  loads: amounts
 }))("Town/Policy")
 
 /**
@@ -296,6 +298,12 @@ export const Chronicle = Descriptor.ConstructedResource(Decode.struct({
   lines: Decode.array(Decode.struct({ tick: integer, text: Decode.string, alarm: Decode.boolean, at: Decode.nullable(cell) }))
 }))("Town/Chronicle")
 
+/**
+ * The mayor's guide (see `rules/guide.ts`): the steps it has put away, done or
+ * dismissed, and whether the mayor turned it off. Written by the page, not the
+ * simulation; saved with the town.
+ */
+export const Guide = Descriptor.ConstructedResource(Decode.struct({ done: Decode.array(Decode.string), off: Decode.boolean }))("Town/Guide")
 /** How desirable each cell is to live on (by `key`), reckoned every `appeal.every` steps; empty before the first. */
 export const Appeal = Descriptor.ConstructedResource(Decode.struct({ cells: Decode.array(integer) }))("Town/Appeal")
 
@@ -351,7 +359,7 @@ export const Game = Schema.bind(
       Paused, Staff, Inventory, Storage, Recipe, Gatherer, Planter, Carriers, Service, Patrol, Figure, Route, Errand, Rescue, Roam
     },
     resources: {
-      Time, Rng, Treasury, Ledger, Census, Policy, Charter, Land, Market, Mood, Crown, Fate, History, Chronicle, Appeal, Pantry, Fires,
+      Time, Rng, Treasury, Ledger, Census, Policy, Charter, Land, Market, Mood, Crown, Fate, History, Chronicle, Guide, Appeal, Pantry, Fires,
       Grid, Stock
     },
     relations: { WalkerOf, FieldOf }

@@ -4,7 +4,12 @@ import type { GameScene } from "./scene.ts"
 
 /** Camera gestures and game gestures share the canvas, but a pan, orbit or
  * pinch never commits a build stroke or a selection. Game coordinates come
- * from the ground ray; object IDs come from the rendered instances. */
+ * from the ground ray; object IDs come from the rendered instances.
+ *
+ * A finger has no hover, so on touch the tap tools (place, prop, bulldoze)
+ * take two taps: the first shows the ghost or outline where it lands and
+ * holds it there, a second tap on the same spot commits it. The game only
+ * ever sees the ordinary press and release of the confirming tap. */
 export class MapInput {
   private scene: GameScene
   private ui: UiValue
@@ -13,6 +18,7 @@ export class MapInput {
   private pinch: { distance: number; angle: number; mid: Point } | null = null
   private screen: Point | null = null
   private mode: "pan" | "rotate" = "pan"
+  private armed: { tool: string; at: Point; hit: number | null } | null = null
   readonly controls: HTMLElement
   private abort = new AbortController()
   constructor(scene: GameScene, ui: UiValue) {
@@ -58,6 +64,7 @@ export class MapInput {
       "pointermove",
       (e) => {
         const p = at(e)
+        if (e.pointerType === "mouse") this.armed = null
         if (this.pointers.has(e.pointerId)) this.pointers.set(e.pointerId, p)
         if (this.pinch && this.pointers.size === 2) {
           const next = this.spread()
@@ -95,14 +102,14 @@ export class MapInput {
       if (press?.id === e.pointerId) {
         const input = scene.inputAt(p.x, p.y, ui.tool)
         const panned = cancelled || press.mode === "rotate" || e.button !== 0 || (press.mode === "pan" && press.moved)
-        ui.gestures.push({ type: "release", at: press.mode === "edit" ? scene.groundAt(p.x, p.y) : input.at, hit: input.hit, panned })
+        const held = e.pointerType === "touch" && !panned && this.arm(input.at, input.hit)
+        if (!held) ui.gestures.push({ type: "release", at: press.mode === "edit" ? scene.groundAt(p.x, p.y) : input.at, hit: input.hit, panned })
         if (panned) ui.dragFrom = null
         this.press = null
       }
       if (e.pointerType !== "mouse") {
         this.screen = null
-        ui.pointer = null
-        ui.pointerHit = null
+        this.updatePointer()
       }
     }
     canvas.addEventListener("pointerup", (e) => release(e, false), { signal })
@@ -131,17 +138,16 @@ export class MapInput {
     this.controls = document.createElement("nav")
     this.controls.className = "camera-controls"
     this.controls.setAttribute("aria-label", "地图镜头")
-    this.controls.innerHTML = `<button data-mode="pan" aria-pressed="true" title="拖动平移；道路、铺石、住宅和公园地面工具通过拖动建造">平移</button><button data-mode="rotate" aria-pressed="false" title="拖动旋转地图；右键拖动也可旋转">旋转</button><button data-action="left" aria-label="向左旋转地图" title="向左旋转（Q）">↶</button><button data-action="right" aria-label="向右旋转地图" title="向右旋转（E）">↷</button><button data-action="out" aria-label="缩小">−</button><output aria-label="镜头缩放"></output><button data-action="in" aria-label="放大">+</button><button data-action="reset" aria-label="重置镜头" title="恢复初始角度和中心（Home）">⌂</button>`
+    this.controls.innerHTML = `<button data-mode="pan" aria-pressed="true" title="拖动平移；道路、铺石、住宅和公园地面工具通过拖动建造">平移</button><button data-mode="rotate" aria-pressed="false" title="拖动旋转地图；右键拖动也可旋转，Q 和 E 每次旋转八分之一圈">旋转</button><button data-action="out" aria-label="缩小">−</button><output aria-label="镜头缩放"></output><button data-action="in" aria-label="放大">+</button><button data-action="reset" aria-label="重置镜头" title="恢复初始角度和中心（Home）">⌂</button>`
     this.controls.querySelectorAll<HTMLButtonElement>("button").forEach(
       (button) =>
         (button.onclick = () => {
           if (button.dataset.mode) {
-            this.mode = button.dataset.mode as "pan" | "rotate"
+            // Rotate toggles, so a phone can do without the Pan button.
+            this.mode = button.dataset.mode === "rotate" && this.mode === "rotate" ? "pan" : (button.dataset.mode as "pan" | "rotate")
             ui.dragFrom = null
             this.press = null
           }
-          if (button.dataset.action === "left") scene.rotate(-Math.PI / 4)
-          if (button.dataset.action === "right") scene.rotate(Math.PI / 4)
           if (button.dataset.action === "out") scene.zoomBy(0.8)
           if (button.dataset.action === "in") scene.zoomBy(1.25)
           if (button.dataset.action === "reset") scene.resetCamera()
@@ -182,11 +188,33 @@ export class MapInput {
         }
       : null
   }
+  /** A touch tap with a tap tool: the first tap arms (and returns true, so the
+   * release is held back); a second on the same spot lets the release through. */
+  private arm(at: Point, hit: number | null) {
+    const tool = this.ui.tool
+    if (tool !== "place" && tool !== "prop" && tool !== "bulldoze") return false
+    const armed = this.armed
+    this.armed = null
+    const same = armed && armed.tool === tool && (tool === "bulldoze" && hit !== null ? armed.hit === hit : Math.hypot(armed.at.x - at.x, armed.at.y - at.y) < 1.5)
+    if (same) return false
+    this.armed = { tool, at, hit }
+    this.ui.toast(tool === "bulldoze" ? "再次轻点确认拆除" : "再次轻点确认在此建造")
+    this.updatePointer()
+    return true
+  }
   private updatePointer() {
-    if (this.screen) {
+    if (this.armed && this.armed.tool !== this.ui.tool) this.armed = null
+    // An armed tap holds the ghost where it landed, even while the map pans under it.
+    if (this.armed) {
+      this.ui.pointer = this.armed.at
+      this.ui.pointerHit = this.armed.hit
+    } else if (this.screen) {
       const input = this.scene.inputAt(this.screen.x, this.screen.y, this.ui.tool)
       this.ui.pointer = input.at
       this.ui.pointerHit = input.hit
+    } else {
+      this.ui.pointer = null
+      this.ui.pointerHit = null
     }
   }
   get pointer() {
@@ -210,6 +238,7 @@ export class MapInput {
   }
   reset() {
     this.mode = "pan"
+    this.armed = null
     this.press = null
     this.pinch = null
     this.pointers.clear()

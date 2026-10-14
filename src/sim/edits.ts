@@ -8,16 +8,23 @@
  */
 import { buildingDraft, houseDraft, houseStart, parkDraft, roadDraft, rockDraft, rolesOf, startOf, treeDraft, waterDraft } from "../archetypes.ts"
 import * as Random from "@typeonce/bevy-ts-math/Random"
-import { amounts, goodIds, type Amounts, type Kind, type ParkPiece } from "../content.ts"
+import { amounts, goodIds, RESERVE_MAX, TAX_STEPS, type Amounts, type Kind, type ParkPiece } from "../content.ts"
 import { canPlace, cellsOf, GridBuilder, ownerAt, useAt } from "../grid.ts"
 import { inside } from "../iso.ts"
 import { generate } from "../mapgen.ts"
-import { Appeal, Building, Census, Charter, Chronicle, Crown, Fate, Fires, Game, Rules, History, Inventory, Land, Ledger, Market, Mood, Pantry, Park, Paved, Paused, Policy, Rng, Status, Stock, Storage, Time, TownHall, Treasury, Ui } from "../schema.ts"
+import { Appeal, Building, Census, Charter, Chronicle, Crown, Fate, Fires, Game, Guide, Rules, History, Inventory, Land, Ledger, Market, Mood, Pantry, Park, Paved, Paused, Policy, Rng, Status, Stock, Storage, Time, TownHall, Treasury, Ui } from "../schema.ts"
 import { elapsed, rollWinters, TileRead, useOf, write } from "./shared.ts"
 import { crownGap, foundedFate } from "./term.ts"
 
 export const unlocked = (kind: Pick<Kind, "unlock"> | ParkPiece, census: { readonly settlers: number; readonly citizens: number }) =>
   census.settlers + census.citizens >= kind.unlock.residents && census.citizens >= kind.unlock.citizens
+/** What a town still lacks before it can build `kind`, or `null` when it can. */
+export const lockReason = (kind: Pick<Kind, "unlock"> | ParkPiece, census: { readonly settlers: number; readonly citizens: number }): string | null => {
+  const residents = census.settlers + census.citizens
+  if (residents < kind.unlock.residents) return `needs ${kind.unlock.residents} residents (the town has ${residents})`
+  if (census.citizens < kind.unlock.citizens) return `needs ${kind.unlock.citizens} citizens (the town has ${census.citizens})`
+  return null
+}
 
 export const ApplyEdits = Game.System(
   "Town/ApplyEdits",
@@ -46,6 +53,7 @@ export const ApplyEdits = Game.System(
       fate: Game.System.writeResource(Fate),
       history: Game.System.writeResource(History),
       chronicle: Game.System.writeResource(Chronicle),
+      guide: Game.System.writeResource(Guide),
       appeal: Game.System.writeResource(Appeal),
       pantry: Game.System.writeResource(Pantry),
       fires: Game.System.writeResource(Fires)
@@ -120,7 +128,7 @@ export const ApplyEdits = Game.System(
           const tile = { ...edit.cell, size: kind.size }
           if (!kind.buildable) break
           if (!unlocked(kind, resources.census.get())) {
-            ui.toast(`${kind.title} needs a bigger town`)
+            ui.toast(`${kind.title} ${lockReason(kind, resources.census.get())}`)
             break
           }
           if (!canPlace(grid.value(), tile)) {
@@ -212,7 +220,7 @@ export const ApplyEdits = Game.System(
         case "prop": {
           const piece = props[edit.prop]
           if (!unlocked(piece, resources.census.get())) {
-            ui.toast(`${piece.title} needs a bigger town`)
+            ui.toast(`${piece.title}需要更大的城镇`)
             break
           }
           const row = useAt(grid.value(), edit.cell.x, edit.cell.y) === "park"
@@ -261,13 +269,14 @@ export const ApplyEdits = Game.System(
           break
         }
         case "tax":
-          resources.policy.update((p) => ({ ...p, [edit.tier]: edit.rate }))
+          resources.policy.update((p) => ({ ...p, [edit.tier]: Math.max(TAX_STEPS[0], Math.min(TAX_STEPS.at(-1)!, Math.round(edit.rate))) }))
           break
         case "trade":
           resources.policy.update((p) => ({
             ...p,
             sells: edit.mode === "sell" ? [...p.sells.filter((g) => g !== edit.good), edit.good] : p.sells.filter((g) => g !== edit.good),
-            buys: edit.mode === "buy" ? [...p.buys.filter((g) => g !== edit.good), edit.good] : p.buys.filter((g) => g !== edit.good)
+            buys: edit.mode === "buy" ? [...p.buys.filter((g) => g !== edit.good), edit.good] : p.buys.filter((g) => g !== edit.good),
+            loads: edit.amount === undefined ? p.loads : { ...p.loads, [edit.good]: Math.max(0, Math.min(rules.tradeLoad, Math.round(edit.amount))) }
           }))
           break
         case "pause": {
@@ -308,7 +317,7 @@ export const ApplyEdits = Game.System(
           break
         }
         case "reserve":
-          resources.policy.update((p) => ({ ...p, reserve: edit.amount }))
+          resources.policy.update((p) => ({ ...p, reserve: Math.max(0, Math.min(RESERVE_MAX, Math.round(edit.amount))) }))
           break
         case "newTown": {
           for (const id of entities.values()) commands.despawn(id)
@@ -333,9 +342,11 @@ export const ApplyEdits = Game.System(
           resources.appeal.set({ cells: [] })
           resources.pantry.set({ eaten: 0, rotted: 0, eatenLast: 0, rottedLast: 0, warned: -1_000_000 })
           resources.fires.set({ fires: [], next: 1 })
+          // A new town starts the guide over, unless the mayor turned it off.
+          resources.guide.update((g) => ({ done: [], off: g.off }))
           resources.land.set({ mask: land.mask, cells: land.cells })
           resources.ledger.set({ taxes: 0, trade: 0, upkeep: 0, admin: 0 })
-          resources.policy.set({ settlers: 100, citizens: 100, sells: trade.sells, buys: [], reserve: trade.reserve })
+          resources.policy.set({ settlers: 100, citizens: 100, sells: trade.sells, buys: [], reserve: trade.reserve, loads: amounts(Object.fromEntries(goodIds.map((g) => [g, rules.tradeLoad]))) })
           resources.market.set({ prices: amounts(Object.fromEntries(goodIds.map((g) => [g, 100]))) })
           resources.mood.set({ approval: 10, target: 10, base: 0, needs: 0, taxes: 0, debt: 0, crown: 0, winter: 0, grudge: 0, memory: 0 })
           resources.crown.set({ open: false, good: "wood", amount: 0, issued: 0, due: 0, reward: 0, next: crownGap(charter, rules), met: 0, missed: 0, streak: 0, snubs: [] })

@@ -28,12 +28,16 @@ export interface Line {
 
 /** Something that needs looking at now, and where (when it is somewhere). */
 export interface Alert {
+  /** A next step to take, something going wrong, or something that costs the town now. */
+  readonly tone: "hint" | "warn" | "bad"
   readonly text: string
   readonly at: Point | null
   /** The footprint there, cells a side, for the outline. */
   readonly size: number
   /** The entity to select on the way there, if there is one. */
   readonly id: number | null
+  /** Buildings the line names, by kind: where one of each stands, so its chip goes there rather than placing another. */
+  readonly places?: Partial<Record<KindId, { readonly at: Point; readonly size: number; readonly id: number }>>
 }
 
 export type Tool = "select" | "road" | "pave" | "home" | "bulldoze" | "place" | "ground" | "prop"
@@ -58,8 +62,8 @@ export type Edit =
   | { readonly type: "remove"; readonly cell: Point }
   /** Sets a tier's tax rate, in percent of the usual. */
   | { readonly type: "tax"; readonly tier: "settlers" | "citizens"; readonly rate: number }
-  /** Sells a good to traders beyond the reserve, buys it up to the reserve, or neither. */
-  | { readonly type: "trade"; readonly good: GoodId; readonly mode: TradeMode }
+  /** Sells a good to traders beyond the reserve, buys it up to the reserve, or neither; `amount`, up to how much a collection. */
+  | { readonly type: "trade"; readonly good: GoodId; readonly mode: TradeMode; readonly amount?: number }
   /** How much of each good the town keeps before selling, and buys up to. */
   | { readonly type: "reserve"; readonly amount: number }
   /** Pauses the building on a cell, or sets it back to work. */
@@ -174,6 +178,7 @@ export interface Stats {
     readonly sells: ReadonlyArray<GoodId>
     readonly buys: ReadonlyArray<GoodId>
     readonly reserve: number
+    readonly loads: Amounts
   }
   readonly stock: Amounts
   /** Each good's price with traders, in percent of the usual. */
@@ -251,6 +256,13 @@ export interface Stats {
   readonly chronicle: ReadonlyArray<{ readonly tick: number; readonly text: string; readonly alarm: boolean; readonly at: Point | null }>
   /** What needs looking at right now, a line each: workshops waiting, workplaces no one can reach, food running out. */
   readonly alerts: ReadonlyArray<Alert>
+  /** The mayor's guide: the step to take now (if any, and the guide is on), and how far along it is. */
+  readonly guide: {
+    readonly step: (Omit<Alert, "tone"> & { readonly key: string; readonly chapter: string; readonly goal: string }) | null
+    readonly done: number
+    readonly total: number
+    readonly off: boolean
+  }
 }
 
 /** A map view's legend: what each colour means. */
@@ -296,5 +308,7 @@ export interface UiValue {
   legend: Legend | null
   /** A place the page points at (from the ticker): outlined until `until`, in the clock's seconds. */
   flash: { readonly cell: Point; readonly size: number; readonly until: number } | null
+  /** What the mayor told the guide since the last frame: put a step away, or turn the guide off or on (see `Guide`). */
+  guide: Array<{ readonly type: "skip"; readonly id: string } | { readonly type: "off" | "on" }>
   toast: (message: string) => void
 }

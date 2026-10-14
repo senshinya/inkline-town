@@ -14,6 +14,7 @@ pnpm dev --host --port 5232
 pnpm typecheck
 pnpm test       # model-based tests: random mayors, rules that must always hold; and saving
 pnpm check      # every way a term can end, ends it
+pnpm check:shared-safety # shared chronicle text cannot execute markup in either panel
 pnpm check:browser # the actual 3D game: placement, picking, saves, populated towns and phone layout
 pnpm balance    # a bot plays terms headless and reports the pressure
 ```
@@ -28,7 +29,19 @@ drive the approved 3D models. Drag to pan; right-drag or choose **Rotate** to
 turn and tilt. Scroll to zoom. Q/E turn, arrow keys pan, Home resets, and
 the camera toolbar provides the same controls. On touch screens, two fingers
 pan and pinch to zoom; twisting them rotates. Road/home tools still drag to
-build; camera gestures never place anything.
+build; camera gestures never place anything. A finger has no hover, so on
+touch the tap tools (buildings, park pieces, bulldoze) take two taps: the
+first holds the ghost or outline where it landed, a second on the same spot
+commits it. This lives entirely in `src/render3d/input.ts`; the game still
+sees one ordinary press and release.
+
+Phones get their layout from `src/phone.css`, loaded after `factory.css`. It
+only moves and resizes what `factory.css` draws, in three media queries:
+compact (narrow or short screens: icon-only bars, a two-line ticker),
+portrait (chrome stacked top and bottom, the panel as a bottom sheet) and
+touch (bigger targets, no key hints, the hint line pinned above the bars).
+New UI needs nothing there unless it has to move on a phone; check it at
+390×844, 360×640 and 844×390.
 
 `src/render3d/scene.ts` owns the orthographic camera, ground projection and
 frame source. `views.ts` follows live construction, upgrades, resources,
@@ -160,6 +173,10 @@ That is how the README's screenshots of grown towns were made.
 - `src/asset-lab/town-props.ts`: parks (ground and furnishings, drawn cell by cell), stone paving and ruins.
 - `src/asset-lab/services.ts`: grain hoist, fish racks, watch tower, herbs,
   medical signs, street noticeboard and builder's equipment.
+- `src/share/`: sharing a town: the card it is shared as (`card.ts`), the format and limits the page and the
+  server agree on (`format.ts`), and the page's side: uploading, fetching, and the device's share sheet (`client.ts`).
+- `src/server/`: the only server code: the routes behind shared towns (`handler.ts`), the Cloudflare Worker that
+  runs them (`worker.ts`), and the same routes under `pnpm dev`, over a bucket in memory (`dev.ts`).
 - `src/asset-lab/appearance.ts`: material state metadata for catalogue presets.
   Wear, neighbourhood, hazards and winter are per-instance attributes in the
   live renderer. A state change does not change the geometry cache key.
@@ -246,6 +263,39 @@ pnpm balance -- --seeds 1 --verbose --every 1   # minute by minute
 pnpm balance -- --snapshot 40                   # save each seed's town at minute 40 (see above)
 ```
 
+## Sharing a town
+
+**share** (bottom right, and on the reckoning) draws the town as the camera
+sees it into a 1200 × 630 card (at 2×), with the term's state and numbers on a
+strip of paper. **Save the picture** downloads it; on a phone it goes to the
+share sheet instead. **Make a link** uploads the town (its save file, gzipped,
+with the camera) and a JPEG of the card; `/t/<id>` then opens the game on that
+town, running, with the building tools put away until the visitor chooses
+**Play from here** (the town becomes theirs and autosaves) or founds their own.
+A shared town loads through `loadText` in `src/save.ts`, so it is checked and
+carried forward between save versions exactly as a save is.
+
+The server (`src/server/handler.ts`) keeps each share as two files in an R2
+bucket, `towns/<id>.json.gz` (its preview's title and description as metadata)
+and `towns/<id>.picture`:
+
+| route | does |
+|---|---|
+| `POST /api/towns` | checks the town is gzip under 100 KB, the picture a JPEG/PNG/WebP under 500 KB, and the lines short and plain; keeps them under a new id |
+| `GET /api/towns/<id>` and `/picture` | the files as kept, cached for a year (shares never change) |
+| `GET /t/<id>` | the game's `index.html` with the share's Open Graph and Twitter tags written in, so links unfurl to the card |
+
+The Worker runs only for `/t/*` and `/api/*`; everything else is a static
+file, served free and unmetered. Shares are deleted after 180 days by a
+lifecycle rule on the bucket. Uploads are limited per visitor, by a hash of
+their IP: 3 a minute through Cloudflare's rate-limit binding (`SHARE_BURST`,
+declared in `deploy/alchemy.run.ts`; no resource behind it), and 20 a day
+counted in the same bucket under `limits/<day>/<visitor>`, which a second
+lifecycle rule clears after a day. Either answers 429 with a line the page
+shows. Under `pnpm dev` the same routes run in Vite
+over a bucket in memory (shares last until the server stops), so sharing
+works locally and `pnpm check:browser` checks it end to end.
+
 ## Testing
 
 The simulation has no renderer in it: it runs headless (`src/sim/headless.ts`),
@@ -270,6 +320,10 @@ breaks a rule. A second property checks that the same charter and commands
 always make the same town. `RUNS=200 pnpm test` searches harder;
 `SEED=…` replays.
 
+`test/share.test.ts` checks the server's routes and what they refuse, and
+carries a real town through them into another headless town, which must
+then play on step for step the same as the original.
+
 `pnpm check` puts the real simulation into each way a term can end
 (complete, bankrupt, revolt, abandoned, dismissed, run out), checks an unanswered
 crown request, and checks that a town saved mid-term loads back the same. It
@@ -284,9 +338,11 @@ mends falls down while one by a builder's yard is kept.
 ## Releasing to Cloudflare
 
 The game is deployed with [Alchemy](https://alchemy.run/) as a Cloudflare
-Worker serving the Vite build. The separate `deploy/` package keeps its
-dependencies out of the game, and Cloudflare stores the deployment state.
-Saves stay in the player's browser.
+Worker serving the Vite build, with an R2 bucket (`Shares`) for shared
+towns. The separate `deploy/` package keeps its dependencies out of the game,
+and Cloudflare stores the deployment state. Saves stay in the player's
+browser; only towns a player shares go to the bucket. R2 needs a payment
+method on the account even within its free tier.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -299,8 +355,8 @@ Release from an up-to-date `main`. The release command checks the game's
 types and simulation and the deployment config, then Alchemy builds and
 deploys the game to <https://inkline.typeonce.dev>. Alchemy attaches that
 custom domain to the `prod` Worker and creates its DNS record and certificate
-in the `typeonce.dev` Cloudflare zone. Check that the game opens and save/load
-works there after each release.
+in the `typeonce.dev` Cloudflare zone. Check that the game opens, save/load
+works, and a shared link opens and unfurls there after each release.
 
 `admin` is the existing local Alchemy Cloudflare profile. On another
 machine, use your own logged-in profile or set `CLOUDFLARE_ACCOUNT_ID` and
