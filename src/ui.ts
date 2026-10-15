@@ -66,7 +66,7 @@ export type Edit =
   | { readonly type: "trade"; readonly good: GoodId; readonly mode: TradeMode; readonly amount?: number }
   /** How much of each good the town keeps before selling, and buys up to. */
   | { readonly type: "reserve"; readonly amount: number }
-  /** Pauses the building on a cell, or sets it back to work. */
+  /** Pauses the building on a cell (or closes the home), or sets it back to work. */
   | { readonly type: "pause"; readonly cell: Point; readonly on: boolean }
   /** Sends the crown what it asked for. */
   | { readonly type: "deliver" }
@@ -103,9 +103,11 @@ export interface Preview {
   /** Bulldozing: the hovered thing is tinted. */
   danger: boolean
   tooltip: string | null
+  /** A road, pave, home, or park stroke being dragged: how much it lays and what it costs. */
+  stroke: string | null
 }
 
-export const emptyPreview = (): Preview => ({ plots: [], ghosts: [], roads: [], range: [], rangeNote: null, parks: [], hover: null, danger: false, tooltip: null })
+export const emptyPreview = (): Preview => ({ plots: [], ghosts: [], roads: [], range: [], rangeNote: null, parks: [], hover: null, danger: false, tooltip: null, stroke: null })
 
 /** The side panel: the build menu, the town's numbers and taxes, a building, or a home. */
 export type Panel =
@@ -122,6 +124,8 @@ export type Panel =
       /** Whether it can be paused (not the town hall, not a site), and whether it is. */
       readonly pausable: boolean
       readonly paused: boolean
+      /** What pulling it down costs and gives back: "pull down: −25 coins · 2 planks back". */
+      readonly salvage: string
       readonly lines: ReadonlyArray<Line>
     }
   | {
@@ -129,6 +133,10 @@ export type Panel =
       readonly id: number
       readonly cell: Point
       readonly tier: Tier
+      /** Whether it can be closed (standing, not on fire), and whether it is: a closed home stands empty and costs nothing. */
+      readonly closable: boolean
+      readonly closed: boolean
+      readonly salvage: string
       readonly lines: ReadonlyArray<Line>
       /** What keeps it from the next tier, a line each; empty when nothing does (or there is no next tier). */
       readonly blockers: ReadonlyArray<Line>
@@ -164,6 +172,8 @@ export interface Stats {
   readonly taxes: number
   /** What the same homes would pay a minute with every need met: taxes left on the table when it is more. */
   readonly suppliedTaxes: number
+  /** Taxes a minute at each step of a tier's rate, once the homes settle at it; empty while the tier has no homes. */
+  readonly taxOutlook: Readonly<Record<"settlers" | "citizens", ReadonlyArray<{ readonly rate: number; readonly taxes: number }>>>
   readonly trade: number
   readonly upkeep: number
   readonly admin: number
@@ -239,6 +249,21 @@ export interface Stats {
   }
   readonly goals: ReadonlyArray<{ readonly text: string; readonly value: string; readonly met: boolean }>
   readonly larder: number
+  /**
+   * Each good over the last minute: made, used (eaten, worked up, built
+   * with, rotted, sent away), and bought less sold; and how much the town
+   * holds outside storage now (workshops, markets, baskets, crates). A
+   * rolling minute, reckoned again every ten seconds; `null` for the
+   * first half minute.
+   */
+  readonly flow: {
+    readonly made: Amounts
+    readonly used: Amounts
+    readonly traded: Amounts
+    readonly elsewhere: Amounts
+    /** The treasury over the same minute: taxes and other income, upkeep and spending, and trade. */
+    readonly coins: { readonly made: number; readonly used: number; readonly traded: number }
+  } | null
   /** Food the town ate, and food that rotted in store, over the last minute. */
   readonly eaten: number
   readonly rotted: number
@@ -287,6 +312,8 @@ export interface UiValue {
   pointerHit?: number | null
   /** Where a road, a row of homes, or a patch of park being dragged started. */
   dragFrom: Point | null
+  /** The stroke from `dragFrom` is held for a tap to confirm (touch), or let go here it would be dropped (off the map). */
+  stroke?: "held" | "cancel" | null
   selected: number | null
   gestures: Array<Gesture>
   edits: Array<Edit>

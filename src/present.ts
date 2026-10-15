@@ -7,13 +7,13 @@
 import { RenderSync } from "@typeonce/bevy-ts-render"
 import { hazardStrength } from "./render3d/surface-state.ts"
 
-import { appealAt, appealParts, buildingSource, landSource, parkSources, parksOf, type AppealSource, type ParkCell, type ParkValue } from "./appeal.ts"
+import { appealAt, appealParts, buildingSource, homeSource, landSource, parkSources, parksOf, type AppealSource, type ParkCell, type ParkValue } from "./appeal.ts"
 import { homeHeight, topOf, type Alert, type Load, type Emphasis } from "./art.ts"
 import { BuildingView, HouseView, WalkerView, TreeView, RockView, FieldView, RuinView } from "./render3d/views.ts"
 import type { DoorSet, OverlayCell } from "./render3d/models.ts"
 import {
-  BUILD_TICKS, COMMUTE, condition as wear, CONDITION_MAX, costText, crewOf, crown as crownRules, fate, goodIds, goods, grounds, home, kinds, needTitle,
-  PAVE_COST, propIds, props, risk, RISK_MAX, ROAD_COST, tierHome, total, winters, type GoodId, type Kind, type KindId, type Tier
+  amounts, BUILD_TICKS, COMMUTE, condition as wear, CONDITION_MAX, costText, crewOf, crown as crownRules, fate, goodIds, goods, grounds, home, kinds, needTitle,
+  PAVE_COST, propIds, props, risk, RISK_MAX, ROAD_COST, tierHome, total, winters, type Amounts, type GoodId, type Kind, type KindId, type Tier
 } from "./content.ts"
 import { around, canPlace, cellOf, doors, entrances, isRoad, key, lPath, nearest, reach, useAt, type TileLike } from "./grid.ts"
 import { GRID, inside, U, type Point } from "./iso.ts"
@@ -67,6 +67,7 @@ import {
   StageService,
   Status,
   Stock,
+  Flow,
   Tile,
   Time,
   TownHall,
@@ -85,10 +86,12 @@ import { capacity, CELL_STEPS, elapsed, goalsOf, larder, lockReason, met, season
 import { Townsfolk } from "./townsfolk.ts"
 import { emptyPreview, type Alert as Notice, type HitBox, type Legend, type Line, type View } from "./ui.ts"
 import { blockers as blockersOf, streetAdvice, type InTown, type Served, type Street } from "./rules/explain.ts"
-import { breadBonus, streetTax, suppliedTaxOf } from "./rules/households.ts"
+import { breadBonus, moreAdmin, streetTax, suppliedTaxOf, taxOutlook, type TaxedHome } from "./rules/households.ts"
+import { approvalTarget } from "./rules/approval.ts"
+import { salvageOf, salvageText } from "./rules/salvage.ts"
 import { rockBlocks, type RockPart } from "./render3d/rock-blocks.ts"
 import { GUIDE_QUIET, guideDone, guideStep, guideSteps, type GuideFacts, type GuideFocus } from "./rules/guide.ts"
-import { ticks } from "./content.ts"
+import { TAX_STEPS, ticks } from "./content.ts"
 
 const cellAt = (at: Point): Point => {
   return { x: Math.floor(at.x), y: Math.floor(at.y) }
@@ -191,7 +194,8 @@ const HouseRead = Game.Query({
     risk: Game.Query.optional(Risk),
     condition: Game.Query.optional(Condition),
     burning: Game.Query.optional(Burning),
-    sick: Game.Query.optional(Sick)
+    sick: Game.Query.optional(Sick),
+    closed: Game.Query.optional(Paused)
   }
 })
 const RuinRead = Game.Query({ selection: { tile: Game.Query.read(Tile), ruin: Game.Query.read(Ruin) } })
@@ -344,6 +348,7 @@ export const Interact = Game.System(
       treasury: Game.System.readResource(Treasury),
       ledger: Game.System.readResource(Ledger),
       stock: Game.System.readResource(Stock),
+      flow: Game.System.readResource(Flow),
       policy: Game.System.readResource(Policy),
       time: Game.System.readResource(Time),
       charter: Game.System.readResource(Charter),
@@ -412,6 +417,21 @@ export const Interact = Game.System(
       return hit ?? parkAt.get(key(Math.floor(at.x), Math.floor(at.y)))?.entity.id ?? null
     }
     const parkText = (p: ParkValue) => `宜居度 ${signed(p.value)}，影响 ${p.reach} 格`
+    /**
+     * What new cottages would bring in, fed, at the settlers' rate on their streets, less what they add to the
+     * town hall's administration (see `moreAdmin`): the sum that turns once a town is large.
+     */
+    const homesWorth = (at: ReadonlyArray<Point>) => {
+      if (at.length === 0) return ""
+      const n = at.length, standing = houses.filter((row) => !row.data.closed.present).length
+      const fed = { tier: 1 as Tier, food: 1, bread: 0, cloth: 0, faith: 0, residents: home.tiers[1].residents }
+      const pays = at.reduce((sum, c) => {
+        const d = appealAt(cells, c.x, c.y)
+        return sum + taxOf({ ...fed, residents: capacity(fed, approval, d, undefined, rates.settlers) }, rates, undefined, d)
+      }, 0)
+      const worth = Math.round(pays - moreAdmin(standing, n))
+      return ` · 供餐后扣除行政开支，预计每分钟净收益 ${signed(worth)} 金币${worth <= 0 ? " · 行政负担较重：升级住宅比继续扩建更划算" : ""}`
+    }
 
     const hits: Array<HitBox> = [
       ...buildings.map(({ entity, data }) => {
@@ -505,7 +525,19 @@ export const Interact = Game.System(
       else ui.flash = null
     }
 
-    if (ui.tool === "road" || ui.tool === "home" || ui.tool === "pave") {
+    /** A cost `n` times over. */
+    const times = (cost: Kind["cost"], n: number): Kind["cost"] => ({
+      coins: cost.coins * n,
+      materials: Object.fromEntries(Object.entries(cost.materials).map(([g, m]) => [g, (m ?? 0) * n]))
+    })
+    const counted = (n: number, what: string) => `${n} ${what}`
+    // Let go off the map (over the tool bar, say) and the stroke is dropped: it shows as blocked.
+    const dropping = ui.stroke === "cancel" && ui.dragFrom !== null
+    if (dropping && cell && (ui.tool === "road" || ui.tool === "home" || ui.tool === "pave" || ui.tool === "ground")) {
+      for (const c of ui.tool === "ground" ? rectangle(ui.dragFrom!, cell) : lPath(ui.dragFrom!, cell))
+        if (inside(c.x, c.y)) preview.plots.push({ ...c, size: 1, look: "blocked" })
+      preview.tooltip = "在此松手可取消"
+    } else if (ui.tool === "road" || ui.tool === "home" || ui.tool === "pave") {
       const cells = cell === null ? [] : ui.dragFrom ? lPath(ui.dragFrom, cell) : [cell]
       for (const c of cells) {
         if (!inside(c.x, c.y)) continue
@@ -522,9 +554,18 @@ export const Interact = Game.System(
       }
       if (ui.tool === "home" && cell && inside(cell.x, cell.y)) {
         rangeFrom({ ...(ui.dragFrom ?? cell), size: 1 }, COMMUTE + 1, `居民步行上班范围为 ${COMMUTE} 格道路`)
-        preview.tooltip = `住宅 · 每栋 ${costText(home.cost)} · 沿道路建造 · ${preview.rangeNote ?? "连接道路后，居民可在步行范围内上班，最多" + COMMUTE + " 格道路"}`
+        preview.tooltip = `住宅 · 每栋 ${costText(home.cost)} · 沿道路建造${homesWorth(preview.ghosts.map((g) => g.cell))} · ${preview.rangeNote ?? "连接道路后，居民可步行到 " + COMMUTE + " 格道路以内的工作地点"}`
       }
       if (ui.tool === "road" && cell) preview.tooltip = `道路 · 每格 ${ROAD_COST} 金币 · 建筑一侧中点需要连接道路`
+      if (ui.dragFrom && cell) {
+        const n = ui.tool === "road" ? preview.roads.length : ui.tool === "home" ? preview.ghosts.length : preview.plots.filter((p) => p.look === "reach").length
+        preview.stroke =
+          ui.tool === "road"
+            ? `${counted(n, "格道路")} · ${costText({ coins: n * ROAD_COST, materials: {} })}`
+            : ui.tool === "home"
+              ? `${counted(n, "栋住宅")} · ${costText(times(home.cost, n))}${homesWorth(preview.ghosts.map((g) => g.cell))}`
+              : `铺石 ${counted(n, "格")} · ${costText({ coins: n * PAVE_COST.coins, materials: { stone: n * PAVE_COST.stone } })}`
+      }
     } else if (ui.tool === "ground" && cell) {
       const laid: Array<ParkCell> = []
       for (const c of ui.dragFrom ? rectangle(ui.dragFrom, cell) : [cell]) {
@@ -537,8 +578,9 @@ export const Interact = Game.System(
       const after = laid.length > 0 ? parkOf(laid[0]!, laid) : undefined
       // What the park it joins gives now, if it joins one.
       const before = laid.map((c) => parkOf(c)).find((p) => p !== undefined)
-      const cost = grounds[ui.ground].cost
-      preview.tooltip = `${grounds[ui.ground].title.toLowerCase()} · ${laid.length} 格，${costText({ coins: cost.coins * laid.length, materials: Object.fromEntries(Object.entries(cost.materials).map(([g, n]) => [g, (n ?? 0) * laid.length])) })}${after ? ` · 公园：${parkText(after)}${before && before.value !== after.value ? `（当前 ${signed(before.value)}）` : ""}` : ""} · 拖出矩形`
+      const cost = costText(times(grounds[ui.ground].cost, laid.length))
+      if (ui.dragFrom) preview.stroke = `${grounds[ui.ground].title.toLowerCase()} · ${counted(laid.length, "格")} · ${cost}`
+      preview.tooltip = `${grounds[ui.ground].title.toLowerCase()} · ${counted(laid.length, "格")}, ${cost}${after ? ` · 公园： ${parkText(after)}${before && before.value !== after.value ? `（当前 ${signed(before.value)}）` : ""}` : ""} · 拖出矩形铺设`
       if (after) preview.plots.push(...reachPlots(after))
     } else if (ui.tool === "prop" && cell && inside(cell.x, cell.y)) {
       const there = parkAt.get(key(cell.x, cell.y))?.data.park.get()
@@ -600,7 +642,12 @@ export const Interact = Game.System(
       for (const { data } of queries.paved.each()) sources.push(landSource("paved", data.tile.get()))
       sources.push(...parkSources(parkCells, road))
       for (const { data } of ruins) sources.push(landSource("ruin", data.tile.get()))
-      for (const { data } of houses) if ((maybe(data.condition)?.value ?? CONDITION_MAX) < wear.worn) sources.push(landSource("worn", data.tile.get()))
+      for (const { data } of houses) {
+        if (data.site.present || data.rising.present) continue
+        if ((maybe(data.condition)?.value ?? CONDITION_MAX) < wear.worn) sources.push(landSource("worn", data.tile.get()))
+        const fine = data.closed.present ? null : homeSource(data.house.get().tier, data.tile.get())
+        if (fine) sources.push(fine)
+      }
       return sources
     }
     /** Where a home's residents work: the nearest workplace of their crew in reach that has them. */
@@ -759,6 +806,13 @@ export const Interact = Game.System(
       const h = row.data.house.get()
       const site = maybe(row.data.site)
       if (site) return { h, lines: [{ icon: "planks", label: "工地", value: "等待木板", tone: "warn" } as Line], blockers: [] as Array<Line> }
+      if (row.data.closed.present) {
+        return {
+          h,
+          lines: [{ icon: "settlers", label: "已关闭", value: "空置：不缴税，也不产生行政开支", tone: "warn", note: "重新开放后，居民会逐渐入住" } as Line],
+          blockers: [] as Array<Line>
+        }
+      }
       const tile = row.data.tile.get()
       const tier = home.tiers[h.tier]
       const next = h.tier < 3 ? home.tiers[(h.tier + 1) as Tier] : null
@@ -770,7 +824,8 @@ export const Interact = Game.System(
       const condition = maybe(row.data.condition)
       const town = inTown()
       const served = servedAt(tile)
-      const cap = capacity(h, approval, desirability)
+      const rate = h.tier === 1 ? rates.settlers : rates.citizens
+      const cap = capacity(h, approval, desirability, undefined, rate)
       const whyFewer =
         cap >= tier.residents
           ? undefined
@@ -780,10 +835,11 @@ export const Interact = Game.System(
               ? "支持度偏低，入住人数减少"
               : desirability < 0
                 ? `宜居度 ${signed(desirability)} 导致入住减少：${streetAdvice(street)}`
-                : "需求尚未全部满足，入住人数减少"
+                : rate > 100 && capacity(h, approval, desirability) > cap
+                  ? `${tier.title}税率为 ${rate}%，部分居民迁出`
+                  : "需求尚未全部满足，入住人数减少"
       const taxLine = (() => {
         const factors: Array<string> = []
-        const rate = h.tier === 1 ? rates.settlers : rates.citizens
         if (rate !== 100) factors.push(`税率 ${rate}%`)
         const st = Math.round((streetTax(desirability) - 1) * 100)
         if (st !== 0) factors.push(`街区影响 ${signed(st)}%`)
@@ -855,17 +911,29 @@ export const Interact = Game.System(
       return { h, lines, blockers }
     }
 
+    /** What pulling a building or home down would cost and give back, for the bulldozer and the panel. */
+    const salvageFor = (cost: Kind["cost"], site: { readonly owed: Amounts } | undefined) => {
+      const s = salvageOf(cost, site?.owed ?? null)
+      const said = salvageText(s)
+      return `${site ? "取消施工" : "拆除"}${said ? `: ${said}` : ""}`
+    }
     const hovered = preview.hover
     const hoveredBuilding = hovered !== null ? buildings.find((row) => row.entity.id === hovered) : undefined
     const hoveredHouse = hovered !== null ? houses.find((row) => row.entity.id === hovered) : undefined
     const hoveredRuin = hovered !== null ? ruins.find((row) => row.entity.id === hovered) : undefined
     if (hoveredBuilding) {
       const { kind, status, problem } = describeBuilding(hoveredBuilding)
-      preview.tooltip = `${kind.title.toLowerCase()} · ${problem ?? { working: "工作中", idle: "空闲", blocked: "库存已满", unconnected: "未连接道路", unstaffed: "缺少工人", starved: "缺少原料", building: "施工中", paused: "已暂停" }[status]}`
+      preview.tooltip = ui.tool === "bulldoze"
+        ? `${kind.title.toLowerCase()} · ${hoveredBuilding.data.hall.present ? "市政厅不可拆除" : salvageFor(kind.cost, maybe(hoveredBuilding.data.site))}`
+        : `${kind.title.toLowerCase()} · ${problem ?? { working: "工作中", idle: "空闲", blocked: "库存已满", unconnected: "未连接道路", unstaffed: "缺少工人", starved: "缺少原料", building: "施工中", paused: "已暂停" }[status]}`
     } else if (hoveredHouse) {
       const h = hoveredHouse.data.house.get()
       const t = hoveredHouse.data.tile.get()
-      preview.tooltip = `${tierHome[h.tier]} · ${h.residents} 位居民 · 宜居度 ${appealAt(cells, t.x, t.y)}${hoveredHouse.data.burning.present ? " · 着火了！" : hoveredHouse.data.sick.present ? " · 患病" : ""}`
+      preview.tooltip = ui.tool === "bulldoze"
+        ? `${tierHome[h.tier]} · ${salvageFor(home.cost, maybe(hoveredHouse.data.site))}`
+        : hoveredHouse.data.closed.present
+        ? `${tierHome[h.tier]} · 已关闭`
+        : `${tierHome[h.tier]} · ${h.residents} 位居民 · 宜居度 ${appealAt(cells, t.x, t.y)}${hoveredHouse.data.burning.present ? " · 着火了！" : hoveredHouse.data.sick.present ? " · 患病" : ""}`
     } else if (hoveredRuin) {
       preview.tooltip = `废墟 · ${{ burnt: "烧毁", collapsed: "坍塌", derelict: "荒废" }[hoveredRuin.data.ruin.get().cause]} · 拆除以清理`
     } else if (hovered !== null && ui.tool === "select" && parkRows.some((row) => row.entity.id === hovered)) {
@@ -880,7 +948,7 @@ export const Interact = Game.System(
       const lock = lockReason(kind, resources.census.get())
       if (lock) preview.tooltip = `${kind.title.toLowerCase()} · ${lock}`
       else preview.tooltip = `${kind.title.toLowerCase()}${r !== null ? ` · 工作范围 ${r} 格` : ""}${a ? ` · 周围 ${a.reach} 格宜居度 ${signed(a.value)}` : ""}${preview.rangeNote ? ` · ${preview.rangeNote}` : ""} · 建筑一侧中点需要连接道路`
-    } else if (ui.tool === "pave") preview.tooltip = `沿道路拖动铺石 · 每格 ${PAVE_COST.coins} 金币和一份石料 · 运输与服务人员速度增加50%，并略微提高沿街宜居度`
+    } else if (ui.tool === "pave" && !dropping) preview.tooltip = `沿道路拖动铺石 · 每格 ${PAVE_COST.coins} 金币和一份石料 · 运输员与服务人员速度提高 50%，并略微提升沿街宜居度`
     else if (cell && ui.view === "appeal" && inside(cell.x, cell.y)) preview.tooltip = `宜居度 ${appealAt(cells, cell.x, cell.y)}`
     ui.preview = preview
 
@@ -901,11 +969,17 @@ export const Interact = Game.System(
         problem,
         lines,
         pausable,
-        paused: pickedBuilding.data.paused.present
+        paused: pickedBuilding.data.paused.present,
+        salvage: salvageFor(kind.cost, maybe(pickedBuilding.data.site))
       }
     } else if (pickedHouse) {
       const { h, lines, blockers } = describeHouse(pickedHouse)
-      ui.panel = { type: "house", id: pickedHouse.entity.id, cell: pickedHouse.data.tile.get(), tier: h.tier, lines, blockers }
+      ui.panel = {
+        type: "house", id: pickedHouse.entity.id, cell: pickedHouse.data.tile.get(), tier: h.tier, lines, blockers,
+        closable: !pickedHouse.data.site.present && !pickedHouse.data.rising.present && !pickedHouse.data.burning.present,
+        closed: pickedHouse.data.closed.present,
+        salvage: salvageFor(home.cost, maybe(pickedHouse.data.site))
+      }
     } else if (pickedPark && picked) {
       ui.panel = {
         type: "park",
@@ -1093,9 +1167,21 @@ export const Interact = Game.System(
     const net = ledger.taxes + ledger.trade - ledger.upkeep - ledger.admin
     const mood = resources.mood.get()
     const crown = resources.crown.get()
+    // What the homes would pay at each step of each tier's rate, once settled there (see `taxOutlook`).
+    const taxed: Array<TaxedHome> = []
+    for (const { data } of houses) {
+      if (data.site.present || data.rising.present || data.burning.present || data.closed.present) continue
+      const tile = data.tile.get()
+      taxed.push({ ...data.house.get(), desirability: appealAt(cells, tile.x, tile.y), paying: true })
+    }
     const f = resources.fate.get()
     const pantry = resources.pantry.get()
     const season = seasonAt(Math.min(Math.max(0, t), termTicks(charter) - 1), charter)
+    const approvalAt = (r: { readonly settlers: number; readonly citizens: number }, memory: number) =>
+      approvalTarget(taxed, r, coins, crown.snubs.length, season.winter, undefined, memory).target
+    const outlookOf = (tier: "settlers" | "citizens") => taxed.some((h) => (h.tier === 1) === (tier === "settlers"))
+      ? TAX_STEPS.map((rate) => ({ rate, taxes: Math.round(taxOutlook(taxed, rates, tier, rate, approvalAt)) }))
+      : []
     const seconds = (steps: number) => Math.max(0, Math.ceil(steps / 60))
     const danger = (since: number, minutes: number) => (since < 0 ? null : seconds(since + minutes * 3600 - t))
     // The winter after the coming one, for the almanac.
@@ -1194,10 +1280,13 @@ export const Interact = Game.System(
       return row ? { at: row.data.tile.get(), id: row.entity.id } : { at: null, id: null }
     }
     const shown = step ? focusOf(step.focus) : null
+    const flowNow = resources.flow.get().last
+    const flowHeld = resources.flow.get().held
     ui.stats = {
       coins,
       taxes: ledger.taxes,
       suppliedTaxes: Math.round(suppliedTaxes),
+      taxOutlook: { settlers: outlookOf("settlers"), citizens: outlookOf("citizens") },
       trade: ledger.trade,
       upkeep: ledger.upkeep,
       admin: ledger.admin,
@@ -1261,6 +1350,7 @@ export const Interact = Game.System(
       },
       goals: goalsOf(charter, { settlers: census.settlers, citizens: census.citizens, coins, net: steadyNet(resources.history.get().samples, net), approval: mood.approval }),
       larder: larder(stock),
+      flow: flowNow === null ? null : { ...flowNow, elsewhere: amounts(Object.fromEntries(goodIds.map((g) => [g, Math.max(0, flowHeld[g] - stock[g])]))) },
       eaten: pantry.eatenLast,
       rotted: pantry.rottedLast,
       sick: census.sick,
@@ -1510,6 +1600,7 @@ export const Animate = Game.System(
               sick: Number(data.sick.present)
             },
             band: desirability < 0 ? "poor" : desirability >= home.tiers[2].appeal ? "fine" : "plain",
+            closed: data.closed.present,
             tint: services.ui.tints.get(entity.id)
           },
           emphasis(entity.id)

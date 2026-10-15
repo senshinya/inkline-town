@@ -336,6 +336,58 @@ export interface GridValue {
 export const Grid = Descriptor.TransientResource<GridValue>()("Town/Grid")
 /** Goods in the town's storage, summed every step. */
 export const Stock = Descriptor.TransientResource<Amounts>()("Town/Stock")
+/** Ten seconds of goods: what the town held as it began, what was made, and what was traded. */
+export interface FlowSlice {
+  readonly start: Amounts
+  readonly made: Amounts
+  readonly traded: Amounts
+  readonly coins: CoinSlice
+}
+/**
+ * Ten seconds of the treasury, counted as goods are: what it held as the
+ * slice began, what came in (taxes, rewards, refunds), and what trade
+ * brought (sold less bought). What went out is what is left over.
+ */
+export interface CoinSlice {
+  readonly start: number
+  readonly made: number
+  readonly traded: number
+}
+/**
+ * Where the town's goods go, over the last minute, a slice of `FLOW_SLICE`
+ * at a time (not saved: it starts over on a load). `made` by workshops and
+ * gatherers and `traded` (bought less sold) are counted into the slice under
+ * way, which began at `since` holding `start`; `held` is everything the
+ * town holds now, in storage or not (workshops, markets, walkers' baskets,
+ * carriers' crates). What was used (eaten, worked up, built with, rotted,
+ * sent to the crown) is what is left over: `start + made + traded − held`.
+ */
+export interface FlowValue {
+  /** Which town it counts (its seed and founding step): a new or loaded town starts over. */
+  readonly town: string
+  readonly since: number
+  readonly start: Amounts | null
+  readonly made: Amounts
+  readonly traded: Amounts
+  readonly held: Amounts
+  /**
+   * The treasury's slice under way. `seen` is the treasury the last count
+   * saw, and `booked` what the collection has already counted since (its
+   * taxes and trade): any other change in between is a coin made, or one
+   * left over as used.
+   */
+  readonly coins: CoinSlice & { readonly seen: number; readonly booked: number }
+  /** The last minute's slices, oldest first. */
+  readonly slices: ReadonlyArray<FlowSlice>
+  /** A minute's worth over the slices kept, or `null` before there are enough to say. */
+  readonly last: {
+    readonly made: Amounts
+    readonly used: Amounts
+    readonly traded: Amounts
+    readonly coins: { readonly made: number; readonly used: number; readonly traded: number }
+  } | null
+}
+export const Flow = Descriptor.TransientResource<FlowValue>()("Town/Flow")
 
 // ── Host services ─────────────────────────────────────────────────────────
 
@@ -360,7 +412,7 @@ export const Game = Schema.bind(
     },
     resources: {
       Time, Rng, Treasury, Ledger, Census, Policy, Charter, Land, Market, Mood, Crown, Fate, History, Chronicle, Guide, Appeal, Pantry, Fires,
-      Grid, Stock
+      Grid, Stock, Flow
     },
     relations: { WalkerOf, FieldOf }
   }),

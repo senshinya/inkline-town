@@ -31,7 +31,7 @@ const root = document.querySelector<HTMLDivElement>("#lab")!
 root.innerHTML = `
   <header><a href="/model-review.html">模型预览 ↗</a><span>完整模型图鉴</span><a href="/effects-lab.html">住宅动态特效 ↗</a></header>
   <div class="intro"><div><h1>熟悉的墨线。<br>不同的角度。</h1><p>对照查看原始绘图与完整 3D 模型。</p></div><span class="tag">程序生成 · 正交投影 · 可旋转</span></div>
-  <div class="filters"><label>合集 <select id="category"></select></label><label>查找 <input id="search" type="search" placeholder="名称或材质"></label><a href="/map-lab.html">在地图中查看全部模型 ↗</a></div><nav class="assets" aria-label="选择模型"></nav>
+  <div class="filters"><label>合集 <select id="category"></select></label><label>查找 <input id="search" type="search" placeholder="名称或材质"></label><a href="/service-upgrades.html">服务建筑等级对比 ↗</a><a href="/map-lab.html">在地图中查看全部模型 ↗</a></div><nav class="assets" aria-label="选择模型"></nav>
   <section class="comparison" aria-label="对比原始绘图与 3D 模型">
     <div class="view"><div class="view-label"><span>01 / 原始绘图</span><span>固定等距视角绘图</span></div><canvas id="reference" aria-label="原始 2D 绘图"></canvas><span class="view-foot">原始 art.ts 绘图</span></div>
     <div class="view"><div class="view-label"><span>02 / 3D 模型</span><span id="angle-label">初始角度</span></div><div id="viewer" role="img" aria-label="可旋转的 3D 模型，水平拖动进行旋转。"></div><span class="view-foot">拖动旋转 · 滚轮缩放</span></div>
@@ -235,7 +235,9 @@ function render() {
   const ref = references.get(selected.id)!
   const model = models.get(selected.id)!
   const effectBounds=selected.smokeEffect||selected.fountains?.length?new THREE.Box3().setFromObject(model.group):null
-  const vertical = Math.max(40, ref.height * 1.45, ((ref.width * height) / width) * 1.3, effectBounds?effectBounds.getSize(new THREE.Vector3()).y*1.45:0) / zoom
+  const upgraded = selected.reference?.type === "building" && selected.reference.tier === 2
+  const bounds = upgraded ? new THREE.Box3().setFromObject(model.group).getBoundingSphere(new THREE.Sphere()) : null
+  const vertical = Math.max(40, ref.height * 1.45, ((ref.width * height) / width) * 1.3, effectBounds?effectBounds.getSize(new THREE.Vector3()).y*1.45:0, bounds ? bounds.radius * 2.4 * Math.max(1, height / width) : 0) / zoom
   renderer.setSize(width, height, false)
   camera.left = (-vertical * width) / height / 2
   camera.right = -camera.left
@@ -243,7 +245,7 @@ function render() {
   camera.bottom = -camera.top
   const heading = ((45 + yaw) * Math.PI) / 180,
     altitude = (pitch * Math.PI) / 180
-  const target = effectBounds?effectBounds.getCenter(new THREE.Vector3()):new THREE.Vector3(0, -(ref.y + ref.height / 2) / Math.cos(Math.PI / 6), 0)
+  const target = bounds?.center ?? (effectBounds?effectBounds.getCenter(new THREE.Vector3()):new THREE.Vector3(0, -(ref.y + ref.height / 2) / Math.cos(Math.PI / 6), 0))
   camera.position
     .copy(target)
     .add(

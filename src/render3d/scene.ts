@@ -74,7 +74,7 @@ export class GameScene {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.NoToneMapping
     this.renderer.domElement.className = "world-canvas"
-    this.renderer.domElement.setAttribute("aria-label", "Inkline Town 3D map. Drag to pan, right-drag to rotate, wheel to zoom.")
+    this.renderer.domElement.setAttribute("aria-label", "墨线小镇三维地图。拖动平移，右键拖动旋转，滚轮缩放。")
     this.renderer.domElement.tabIndex = 0
     mount.append(this.renderer.domElement)
     this.scene.add(this.objects, this.pool.root)

@@ -20,7 +20,7 @@ try {
     await page.goto(process.env.GAME_BASE_URL??"http://127.0.0.1:5232")
     await page.waitForFunction(()=>"town" in window)
     // The found button sits inside the screen without scrolling: it is pinned to the bottom.
-    const found=page.getByRole("button",{name:"建立城镇",exact:true})
+    const found=page.getByRole("button",{name:"新建城镇",exact:true})
     const box=(await found.boundingBox())!
     assert.ok(box.y>=0&&box.y+box.height<=height,`${name}: the found button is off screen`)
     await page.screenshot({path:`${output}/${name}-picker.png`})
@@ -35,6 +35,42 @@ try {
       assert.ok(await page.locator(shows).isVisible(),`${name}: ${button} opens ${shows}`)
       await page.locator(button).click()
       assert.equal(await page.locator(shows).isVisible(),false,`${name}: ${button} folds ${shows}`)
+    }
+    if (name === "portrait") {
+      await page.locator(".toolbar .pause").click()
+      await page.locator(".toolbar button").filter({hasText:/^道路/}).click()
+      const hall = await page.evaluate(() => window.town.runtime.snapshot().entities.find(e => e.components["Town/TownHall"])!.components["Town/Tile"])
+      const cdp = await page.context().newCDPSession(page)
+      const drag = async (dy: number) => {
+        const [a,b] = await page.evaluate(([x,y,dy]) => [window.town.view.project(x!+3.5,y!+dy!,0),window.town.view.project(x!+6.5,y!+dy!,0)], [hall.x,hall.y,dy])
+        await cdp.send("Input.dispatchTouchEvent", {type:"touchStart",touchPoints:[{x:a!.x,y:a!.y}]})
+        for (let i=1;i<=8;i++) {
+          await cdp.send("Input.dispatchTouchEvent", {type:"touchMove",touchPoints:[{x:a!.x+(b!.x-a!.x)*i/8,y:a!.y+(b!.y-a!.y)*i/8}]})
+          await page.waitForTimeout(30)
+        }
+        await cdp.send("Input.dispatchTouchEvent", {type:"touchEnd",touchPoints:[]})
+      }
+      const roads = await page.evaluate(() => window.town.runtime.snapshot().entities.filter(e=>e.components["Town/Road"]).length)
+      await drag(1.5)
+      await page.waitForFunction(() => window.town.ui.stroke === "held", null, {timeout:3000})
+      await drag(-1.5)
+      await page.waitForFunction(() => window.town.ui.stroke === "held", null, {timeout:3000})
+      assert.equal(await page.evaluate(() => window.town.runtime.snapshot().entities.filter(e=>e.components["Town/Road"]).length), roads)
+      await page.locator(".stroke-bar").getByRole("button",{name:"建造",exact:true}).click()
+      await page.waitForFunction(n => window.town.ui.dragFrom===null && window.town.runtime.snapshot().entities.filter(e=>e.components["Town/Road"]).length>n, roads)
+      await cdp.detach()
+      // Once flow data exists the chip opens the minute table, and panning keeps it open.
+      await page.evaluate(() => window.town.advance(35))
+      await page.waitForFunction(() => window.town.ui.stats?.flow !== null)
+      await page.locator(".goods-chip").click()
+      await page.locator(".flow-grid").waitFor({state:"visible"})
+      assert.match(await page.locator(".flow-grid").innerText(), /生产[\s\S]*消耗[\s\S]*仓储/)
+      await page.locator(".goods-chip").click()
+      // The pause button resumes at the previous speed, then pauses again.
+      await page.locator(".toolbar .pause").click()
+      await page.waitForFunction(() => window.town.ui.speed > 0)
+      await page.locator(".toolbar .pause").click()
+      await page.waitForFunction(() => window.town.ui.speed === 0)
     }
     // Everything fits the width: nothing scrolls sideways.
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),`${name}: the page scrolls sideways`)

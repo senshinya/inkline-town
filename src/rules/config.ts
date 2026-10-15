@@ -14,7 +14,7 @@ const inputs = () => ({
   spoils: content.spoils, trade: content.trade, tradeLoad: content.TRADE_LOAD, transport,
   stepSeconds: content.STEP_SECONDS, ledgerTicks: content.LEDGER_TICKS, spoilTicks: content.SPOIL_TICKS,
   commute: content.COMMUTE, apprentice: content.APPRENTICE, toolStock: content.TOOL_STOCK,
-  conditionMax: content.CONDITION_MAX, riskMax: content.RISK_MAX, pausedUpkeep: content.PAUSED_UPKEEP,
+  conditionMax: content.CONDITION_MAX, riskMax: content.RISK_MAX, pausedUpkeep: content.PAUSED_UPKEEP, salvage: content.salvage,
   buildTicks: content.BUILD_TICKS, roadCost: content.ROAD_COST, paveCost: content.PAVE_COST, pavedPace: content.PAVED_PACE,
   grown: content.GROWN, yearsPerTerm: content.YEARS_PER_TERM, staffTicks: content.ticks(0.5), riskTicks: 60,
   spreadTicks: content.ticks(1.5), growTicks: 10
@@ -49,9 +49,9 @@ export const resolveRules = (patches: ReadonlyArray<RulePatch> = []): Rules => {
     // Structural timing and identifier changes are outside numeric economy experiments.
     if (parts[0] === "transport" || ["size", "stories", "bays"].includes(key)) throw new Error(`Structural rule cannot be patched: ${path}`)
     if (["stepSeconds", "ledgerTicks", "spoilTicks", "yearsPerTerm", "staffTicks", "riskTicks", "spreadTicks", "growTicks"].includes(parts[0]!)) throw new Error(`Structural rule cannot be patched: ${path}`)
-    if ((key === "seconds" || key === "growth" || key === "wear" || key === "every" || key === "lasts") && value === 0) throw new Error(`Rule must be positive: ${path}`)
+    if ((key === "seconds" || key === "growth" || key === "wear" || key === "every" || key === "lasts" || key === "perMeal" || key === "calms") && value === 0) throw new Error(`Rule must be positive: ${path}`)
     if ((path.startsWith("home.lasts.") || path.startsWith("spoils.")) && value === 0) throw new Error(`Rule must be positive: ${path}`)
-    if ((["workers", "batch", "inputs", "cap", "carriers", "range", "residents", "settle"].includes(key) || path.includes(".cost.")) && !Number.isInteger(value)) throw new Error(`Rule must be an integer: ${path}`)
+    if ((["workers", "batch", "inputs", "cap", "carriers", "range", "residents", "settle", "perMeal"].includes(key) || path.includes(".cost.")) && !Number.isInteger(value)) throw new Error(`Rule must be an integer: ${path}`)
     if (path === "apprentice" && value > 1) throw new Error("Apprentice pace must be at most one")
     target[key] = value
   }

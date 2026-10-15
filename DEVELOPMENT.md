@@ -33,17 +33,27 @@ pan and pinch to zoom; twisting them rotates. Road/home tools still drag to
 build; camera gestures never place anything. A finger has no hover, so on
 touch the tap tools (buildings, park pieces, bulldoze) take two taps: the
 first holds the ghost or outline where it landed, a second on the same spot
-commits it. This lives entirely in `src/render3d/input.ts`; the game still
-sees one ordinary press and release.
+commits it. The drag tools (road, pave, homes, park ground) hold the stroke
+on touch too: **Cancel** and **Build** sit above the tool bar (in the guide's
+place) and the tooltip says what it lays and costs; a tap on the stroke's end builds it, a tap elsewhere drops
+it, and two fingers move the camera under it. With any pointer, a stroke let
+go off the map (over the tool bar, say) is dropped and shows red while it
+would be, as are a right click or Esc mid-drag. On touch the tooltip shows
+only for what is about to be built, never while panning or picking, in a
+thin full-width strip under the top line. This lives entirely in `src/render3d/input.ts`
+(and the bar in `host.ts`); the game still sees one ordinary press and
+release.
 
 Phones get their layout from `src/phone.css`, loaded after `factory.css`. On
 a narrow or short screen the HUD folds away: one top line (clock, treasury,
 people, and a chip of planks, stone and tools), one tool bar along the bottom
-(town, the tools, pause, a speed button that cycles, and a ⋯ menu holding
+(town, the tools, pause (a switch: play while paused), a speed button that cycles, and a ⋯ menu holding
 share, guide, save, load, new town and recentre), and two buttons top right
 for the guide and the map overlays. `host.ts` sets `body.fold-goods`,
 `fold-guide`, `fold-views` or `fold-more` while one is open; a tap on the map
-folds it. A new guide step peeks above the tool bar for a few seconds. Sheets
+folds it, a pan or pinch does not. Once the town has a minute of goods
+(`body.flow-ready`), the goods chip opens the made/used table straight away,
+each good by its icon. A new guide step peeks above the tool bar for a few seconds. Sheets
 open from the side on a landscape phone (`max-height: 500px`) and from the
 bottom in portrait. Dialogs take the whole screen with their actions pinned
 to the bottom. The camera bar is hidden: pinch zooms and turns. New UI needs
@@ -88,24 +98,30 @@ and elevation controls also work with a keyboard. The original view uses a
 
 | Collection | Entries | Coverage |
 | --- | ---: | --- |
-| Buildings | 37 | Every building kind, plus winter and worn material presets of the seven town services and stores |
+| Buildings | 39 | Every building kind, tier 2 market hall and church, plus winter and worn material presets of the seven town services and stores |
 | Homes | 21 | Four settler and citizen roof palettes, townhouse, and fine/poor/worn/winter material presets of every tier |
-| Land | 24 | Trees, rocks, crops, roads, water, raised stone paving, three retained park furnishings and the park layout |
+| Land | 30 | Trees, single-cell rocks and larger outcrops, crops, roads, water, raised stone paving, three retained park furnishings and the park layout |
 | People | 32 | Carriers, residents, market and chapel walkers, and five equipped service workers |
 | Cargo and vehicles | 75 | Twelve distinct goods and labelled crates; empty handcart/barrow and small/full loads of each good; the approved mixed goods plate |
 | Construction and effects | 14 | Sites, frame/walls, problem sign, smoke, placement outlines and three kinds of ruin |
 
-The 203 entries cover object families and representative seeded variants.
+The 211 entries cover object families and representative seeded variants.
 Continuous growth, construction progress, walk poses and colours can be
 generated; this is not a list of every possible random seed. Page icons
 remain the game's original 2D UI art.
 
 ![Complete 3D world catalogue at a rotated angle](screenshots/3d-catalogue.webp)
 
-`pnpm assets:build` exports 203 GLBs and editable geometry descriptions,
-a manifest, and five standalone viewers to `output/inkline-3d/`:
+[`/service-upgrades.html`](http://localhost:5232/service-upgrades.html) compares
+the market with the market hall and the chapel with the church. The four
+models share one scale and synchronized rotation, tilt and zoom. Each model
+has a GLB download. [The integration handoff](docs/service-upgrade-assets.md)
+describes the asset API and the gameplay work still needed.
+
+`pnpm assets:build` exports 211 GLBs and editable geometry descriptions,
+a manifest, and six standalone viewers to `output/inkline-3d/`:
 `inkline-3d-study.html`, `inkline-3d-map.html`, and
-`inkline-town-model-review.html`, `inkline-house-effects.html`, and `inkline-park.html`. It reimports every GLB and
+`inkline-town-model-review.html`, `inkline-house-effects.html`, `inkline-park.html`, and `inkline-service-upgrades.html`. It reimports every GLB and
 checks geometry and unlit materials. The viewers work without a dev server;
 their optional web fonts use the network. The game build remains separate.
 Material effects render in the viewers and live game. Ordinary GLB viewers
@@ -259,7 +275,8 @@ averaged over the seeds still in office every few minutes.
 ```sh
 pnpm balance -- --size large --term 90 --land harsh
 pnpm balance -- --bot greedy          # sensible (default), greedy (taxes at 200%, sells everything, ignores the crown), idle,
-                                      # crowded (homes packed beside industry, no parks), uncovered (no fire, health, or order services)
+                                      # crowded (homes packed beside industry, no parks), uncovered (no fire, health, or order services),
+                                      # sprawl (taxes as high as the town stands, cottages everywhere, fish caught or bought, no finer homes)
 pnpm balance -- --versus crowded      # the bot against another on the same seeds: citizens, burghers, homes lost
 pnpm balance -- --versus uncovered
 pnpm balance -- --set kinds.sawmill.crew=settlers --set risk.fire.wooden=0   # content changes, numbers or words
@@ -269,6 +286,15 @@ pnpm balance -- --set crown.fine=2 --set kinds.fishery.recipe.seconds=3
 pnpm balance -- --seeds 1 --verbose --every 1   # minute by minute
 pnpm balance -- --snapshot 40                   # save each seed's town at minute 40 (see above)
 ```
+
+The economy is tuned so that spreading cottages stops paying: food goes by the
+resident, administration per home climbs (each more home costs about 6 coins a
+minute at 80 homes), taxes above 100% empty homes directly, and bought goods
+grow dear fast and calm slowly. On a medium fair 60-minute term (10 seeds for
+sensible, 5 for the rest), the sensible bot wins about 7 in 10, crowded wins
+rarely, and sprawl and greedy always lose (sprawl to bankruptcy around minute
+20, greedy to revolt). Under the old numbers sprawl lasted the whole term with
+10,000+ coins.
 
 ## Sharing a town
 

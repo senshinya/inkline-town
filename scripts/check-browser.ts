@@ -44,9 +44,9 @@ try {
   await page.goto(process.env.GAME_BASE_URL??"http://127.0.0.1:5232")
   await page.waitForFunction(()=>window.town)
   assert.equal(await page.locator("html").getAttribute("lang"),"zh-CN")
-  assert.equal(await page.locator(".dialog.open h2").textContent(),"建立城镇")
+  assert.equal(await page.locator(".dialog.open h2").textContent(),"墨线小镇 作者：Sandro Maglione")
   await page.getByRole("button",{name:"小型",exact:true}).click()
-  await page.getByRole("button",{name:"建立城镇",exact:true}).click()
+  await page.getByRole("button",{name:"新建城镇",exact:true}).click()
   await page.waitForFunction(()=>!window.town.ui.founding)
   await page.locator(".toolbar .pause").click()
   const hall=(await entities("Town/TownHall"))[0]!,tile=hall.components["Town/Tile"]
@@ -105,6 +105,13 @@ try {
   await page.waitForFunction(()=>window.town.view.stats().nodes>0)
   assert.deepEqual(await snapshot(),saved.world)
   facts.saveLoadUnchangedFormat=true
+  await page.reload()
+  await page.waitForFunction(()=>window.town)
+  await page.getByRole("button",{name:"继续存档",exact:true}).click()
+  await page.waitForFunction(()=>!window.town.ui.founding)
+  await page.locator(".toolbar .pause").click()
+  assert.ok((await snapshot()).entities.some(e=>e.id===lumber.id && e.components["Town/Building"]?.kind==="lumberjack"))
+  facts.continueSavedTown=true
   const restoredNodes=await page.evaluate(()=>window.town.view.stats().nodes)
   const renderableCount=(await snapshot()).entities.filter(e=>["Town/Building","Town/House","Town/Tree","Town/Rock","Town/Field","Town/Figure"].some(c=>c in e.components)).length
   assert.ok(restoredNodes>=renderableCount,`Restored ${restoredNodes} nodes for ${renderableCount} renderable entities`)
@@ -114,7 +121,7 @@ try {
   await page.getByRole("button",{name:"不保存，直接选择新地图",exact:true}).click()
   await page.getByRole("button",{name:"大型",exact:true}).click()
   await page.getByRole("button",{name:"富饶",exact:true}).click()
-  await page.getByRole("button",{name:"建立城镇",exact:true}).click()
+  await page.getByRole("button",{name:"新建城镇",exact:true}).click()
   await page.waitForFunction(()=>!window.town.ui.founding&&window.town.ui.stats?.charter.size==="large")
   assert.equal((await entities("Town/House")).length,0)
   assert.equal((await entities("Town/TownHall")).length,1)

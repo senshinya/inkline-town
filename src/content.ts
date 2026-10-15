@@ -140,7 +140,7 @@ export interface Kind {
   readonly service?: { readonly service: ServiceId; readonly seconds: number; readonly range: number }
   // ── Its neighbourhood ──
   /** What it does to the desirability of the cells around it, fading out to `reach` cells (see `appeal.ts`). */
-  readonly appeal?: { readonly value: number; readonly reach: number }
+  readonly appeal?: { readonly value: number; readonly reach: number; readonly full?: number }
   /** Uses up a tool every `wear` jobs, and works at half pace without one. */
   readonly wear?: number
   /** Ovens and forges: a fire risk to itself and to homes beside it. */
@@ -161,7 +161,7 @@ export const kinds: Readonly<Record<KindId, Kind>> = {
     category: "storage", size: 3, half: 20, stories: 2, roof: "flat", bays: 2, window: 8, topper: "flag",
     cost: { coins: 0, materials: {} }, upkeep: 0, workers: 0, crew: "settlers", unlock: free, buildable: false,
     holds: { accepts: "all", cap: 100 }, carriers: 6,
-    service: { service: "goods", seconds: 8, range: 20 }, appeal: { value: 4, reach: 3 }
+    service: { service: "goods", seconds: 8, range: 20 }, appeal: { value: 4, reach: 4, full: 2 }
   },
   warehouse: {
     id: "warehouse", title: "仓库", blurb: "在生产地和使用地附近储存物资",
@@ -269,13 +269,13 @@ export const kinds: Readonly<Record<KindId, Kind>> = {
     category: "services", size: 2, half: 12, stories: 1, roof: "flat", bays: 2, window: 6, topper: "flag",
     cost: { coins: 120, materials: { planks: 6, stone: 2 } }, upkeep: 6, workers: 2, crew: "citizens", unlock: free, buildable: true,
     holds: { accepts: ["fish", "smoked", "bread", "cloth"], cap: 12 },
-    service: { service: "goods", seconds: 6, range: 18 }, appeal: { value: 2, reach: 3 }
+    service: { service: "goods", seconds: 6, range: 18 }, appeal: { value: 2, reach: 3, full: 2 }
   },
   chapel: {
     id: "chapel", title: "教堂", blurb: "传教士为沿途住宅提供信仰服务",
     category: "services", size: 2, half: 12, stories: 2, roof: "flat", bays: 2, window: 6, topper: "cupola",
     cost: { coins: 200, materials: { planks: 6, stone: 6 } }, upkeep: 10, workers: 1, crew: "citizens", unlock: { residents: 15, citizens: 0 }, buildable: true,
-    service: { service: "faith", seconds: 8, range: 22 }, appeal: { value: 4, reach: 3 }
+    service: { service: "faith", seconds: 8, range: 22 }, appeal: { value: 4, reach: 4, full: 2 }
   },
   firewatch: {
     id: "firewatch", title: "消防站", blurb: "巡查员降低沿途住宅与工坊的火灾风险，消防员赶赴火场灭火",
@@ -293,7 +293,7 @@ export const kinds: Readonly<Record<KindId, Kind>> = {
     id: "hospital", title: "医院", blurb: "医师巡视更频繁，服务范围更大",
     category: "services", size: 3, half: 16, stories: 2, roof: "flat", bays: 2, window: 6, topper: "cupola",
     cost: { coins: 400, materials: { planks: 10, stone: 10, tools: 2 } }, upkeep: 16, workers: 4, crew: "citizens", unlock: { residents: 0, citizens: 40 }, buildable: true,
-    service: { service: "health", seconds: 4, range: 40 }, appeal: { value: 2, reach: 3 }
+    service: { service: "health", seconds: 4, range: 40 }, appeal: { value: 2, reach: 3, full: 2 }
   },
   watchhouse: {
     id: "watchhouse", title: "治安所", blurb: "警员沿街巡逻，维护沿途住宅的治安",
@@ -391,7 +391,7 @@ export const home = {
   tiers: {
     1: { title: "移民", residents: 4, tax: 2.5, height: 14, needs: ["food"], appeal: -100 },
     2: { title: "市民", residents: 8, tax: 5, height: 26, needs: ["bread", "cloth", "faith"], appeal: 5 },
-    3: { title: "富裕市民", residents: 12, tax: 6.5, height: 38, needs: ["bread", "cloth", "faith"], appeal: 15 }
+    3: { title: "富裕市民", residents: 12, tax: 6.5, height: 38, needs: ["bread", "cloth", "faith"], appeal: 12 }
   } as Readonly<Record<Tier, {
     readonly title: string
     readonly residents: number
@@ -416,7 +416,22 @@ export const home = {
    */
   street: { room: 12, roomLeast: 0.5, tax: 40, taxMost: 0.25 },
   /** A settlers' cottage with bread on the table pays this much more: bread is worth baking before anyone is a citizen. */
-  breadBonus: 0.5
+  breadBonus: 0.5,
+  /**
+   * A walker's visit feeds a home one fish or loaf for every `perMeal`
+   * residents (rounded up): a cottage one, a citizens' home two, a
+   * townhouse three. Food demand grows with the people, not the roofs.
+   */
+  perMeal: 4,
+  /**
+   * Taxes above 100% drive people away directly, besides what they do to
+   * approval: at x = (rate − 100) / 100, a home holds 1 − `linear`·x −
+   * `square`·x² of its residents (settlers: 80% at 150%, half at 200%);
+   * citizens and burghers mind `citizens` as much. So squeezing harder
+   * empties the homes it squeezes, and the most a rate can bring in
+   * comes well before the top of the slider.
+   */
+  taxFlight: { linear: 0.3, square: 0.2, citizens: 0.6 }
 }
 
 /** What a tier's homes are called, and what its residents are. */
@@ -445,6 +460,10 @@ export const appeal = {
   paved: { value: 1, reach: 1 },
   ruin: { value: -3, reach: 2 },
   worn: { value: -2, reach: 1 },
+  /** A citizens' home and a townhouse lift the homes beside them (never themselves), all told up to `homesMost`. */
+  citizens: { value: 1, reach: 1 },
+  burghers: { value: 2, reach: 1 },
+  homesMost: 3,
   /** Desirability is reckoned this often. */
   every: 30,
   /** And kept within these bounds. */
@@ -651,10 +670,14 @@ export const WINTER_WARNING = ticks(60)
 /**
  * Running a town costs more the bigger it gets: the town hall's
  * administration costs `perHome` coins a minute a home, and a further
- * (homes / `growth`) a home, so a large town of poor homes cannot pay
- * its way.
+ * (homes / `growth`) a home. Each more home costs `perHome` + 2·homes /
+ * `growth`: about 6 coins a minute at 80 homes, about what a cottage
+ * brings in once its food is paid for, and a full cottage's taxes by 140,
+ * so past there a town grows by finer homes, not more of them. It is
+ * reckoned by the home, so a townhouse of twelve costs no more than a
+ * cottage of four.
  */
-export const admin = { perHome: 0.4, growth: 120 }
+export const admin = { perHome: 0.5, growth: 30 }
 
 /**
  * Approval, -100 → +100: where the town's mood is heading, and how fast it
@@ -711,13 +734,24 @@ export const crown = {
 
 /**
  * The market: each good's price moves with what the town trades. Selling
- * drives it down, buying up; it drifts back by a tenth of the gap every
- * collection. Buying costs half again the price.
+ * drives it down `perUnit` points a unit, buying up `perBought`. A cheap
+ * price drifts back by a tenth of the gap every collection, a dear one by
+ * only 1/`calms` of it: traders top up a shortfall, but a town that lives
+ * on bought food pays more for it every minute. Buying costs half again
+ * the price.
  */
-export const market = { floor: 30, ceiling: 250, perUnit: 1, markup: 1.5 }
+export const market = { floor: 30, ceiling: 250, perUnit: 1, perBought: 3, markup: 1.5, calms: 30 }
 
 /** A paused building pays this share of its upkeep. */
 export const PAUSED_UPKEEP = 0.25
+
+/**
+ * Pulling down a standing building or home: a `fee` of what it cost in
+ * coins, and `back` of its materials (rounded down) carried back into
+ * storage. A site not yet going up is cancelled instead: its coins and
+ * whatever was brought to it come back in full.
+ */
+export const salvage = { fee: 0.1, back: 0.5 }
 
 /** How long each end state's danger has to last, in minutes, before the term ends with it. */
 export const fate = {

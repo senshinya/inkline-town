@@ -38,6 +38,7 @@ import {
   sizes,
   TAX_STEPS,
   TERMS,
+  YEARS_PER_TERM,
   type Category,
   type CharterValue,
   type GoodId,
@@ -118,8 +119,15 @@ export interface Persistence {
   readonly shareFile: (camera: CameraView) => string
 }
 
-/** `shared`: the page opened on a shared town's link, so it loads that rather than asking for a charter. */
-export const createHost = async (mount: HTMLElement, persistence: () => Persistence, options: { readonly shared?: boolean } = {}) => {
+/**
+ * `shared`: the page opened on a shared town's link, so it loads that rather than asking for a charter.
+ * `saved`: the newest town saved in this browser, which the first charter offers to carry on with.
+ */
+export const createHost = async (
+  mount: HTMLElement,
+  persistence: () => Persistence,
+  options: { readonly shared?: boolean; readonly saved?: { readonly title: string; readonly savedAt: number } | null } = {}
+) => {
   const app = new Application()
   // Pixi remains an offscreen thumbnail renderer for the unchanged menus.
   await app.init({ width: 64, height: 64, antialias: true, resolution: 2, autoStart: false, backgroundAlpha: 0 })
@@ -155,8 +163,9 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     ["fish", "smoked", "wheat", "flour", "bread"],
     ["wool", "cloth"]
   ]
-  stock.title = "城镇库存 · 将鼠标悬停在物资上查看用途"
+  stock.title = "仓储物资及其变化趋势 · 点击查看生产与消耗"
   const goodCells = new Map<GoodId, HTMLElement>()
+  const goodTrends = new Map<GoodId, HTMLElement>()
   for (const group of groups) {
     const cell = el("div", "group")
     for (const g of group) {
@@ -166,9 +175,11 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
       const glyph = el("span", "glyph")
       glyph.innerHTML = goodIcon(g, 18)
       const count = el("span", "count", "0")
-      item.append(glyph, count)
+      const trend = el("span", "trend")
+      item.append(glyph, count, trend)
       cell.append(item)
       goodCells.set(g, count)
+      goodTrends.set(g, trend)
     }
     stock.append(cell)
   }
@@ -187,9 +198,16 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
   // The top line: the clock and treasury (on a phone, the people and a chip of the building goods beside them).
   const topline = el("div", "topline")
   const goodsChip = el("button", "card goods-chip")
-  goodsChip.title = "查看物资库存"
+  goodsChip.title = "查看库存、生产与消耗"
   topline.append(bar, goodsChip)
-  hud.append(topline, stock, request, alarm, ticker)
+  // Under the goods, on a click: each good's last minute, made against used, and where it is held.
+  const flowCard = el("div", "card flow")
+  stock.onclick = (event) => {
+    event.stopPropagation()
+    flowCard.classList.toggle("open")
+  }
+  flowCard.onclick = () => flowCard.classList.remove("open")
+  hud.append(topline, stock, flowCard, request, alarm, ticker)
   const people = el("div", "hud right")
   const folk = el("div", "card bar folk")
   const approval = el("div", "cell")
@@ -276,11 +294,27 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     event.stopPropagation()
     toggleFold("goods")
   }
+  // The treasury opens the same minute the goods do.
+  coins.onclick = (event) => {
+    event.stopPropagation()
+    if (phone.matches) toggleFold("goods")
+    else flowCard.classList.toggle("open")
+  }
   guideBulb.onclick = () => toggleFold("guide")
   layersButton.onclick = () => toggleFold("views")
-  mount.addEventListener("pointerdown", () => {
-    if (fold !== null) setFold(null)
+  // A tap on the map folds them; a pan or a pinch, to look around with the goods or the guide open, does not.
+  let mapPress: { id: number; x: number; y: number; moved: boolean } | null = null
+  mount.addEventListener("pointerdown", (e) => {
+    mapPress = mapPress === null && e.isPrimary ? { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false } : null
   })
+  mount.addEventListener("pointermove", (e) => {
+    if (mapPress?.id === e.pointerId && Math.hypot(e.clientX - mapPress.x, e.clientY - mapPress.y) > 8) mapPress.moved = true
+  })
+  mount.addEventListener("pointerup", (e) => {
+    if (mapPress?.id === e.pointerId && !mapPress.moved && fold !== null) setFold(null)
+    if (mapPress?.id === e.pointerId) mapPress = null
+  })
+  mount.addEventListener("pointercancel", () => (mapPress = null))
   // The people's card joins the top line on a phone, and goes back to the top right on a wider screen.
   const placeFolk = () => {
     if (phone.matches) topline.insertBefore(folk, goodsChip)
@@ -378,8 +412,9 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
   ].map(({ speed, label, key }) => {
     const button = el("button", speed === 0 ? "pause" : "", label)
     if (speed === 0) button.append(iconEl("pause", 14))
-    button.title = speed === 0 ? "暂停游戏（空格）" : `以 ${label} 速度运行（${key}）`
-    button.onclick = () => setSpeed(speed)
+    button.title = speed === 0 ? "暂停或继续游戏（空格键）" : `以 ${label} 运行（${key}）`
+    // Pause is a switch: pressed again it runs the town at its last speed.
+    button.onclick = () => setSpeed(speed === 0 && ui.speed === 0 ? lastSpeed : speed)
     speedGroup.append(button)
     return { speed, button }
   })
@@ -394,8 +429,12 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     if (speed > 0) lastSpeed = speed
     ui.speed = speed
     for (const s of speeds) s.button.classList.toggle("on", s.speed === speed)
+    // Paused, the pause button shows play.
+    const pause = speeds[0]!.button
+    pause.replaceChildren(iconEl(speed === 0 ? "play" : "pause", 14))
+    pause.setAttribute("aria-label", speed === 0 ? "继续游戏" : "暂停游戏")
     cycle.textContent = `${speed === 0 ? lastSpeed : speed}×`
-    cycle.classList.toggle("paused", speed === 0)
+    cycle.title = speed === 0 ? `以 ${lastSpeed} 倍速运行` : "切换速度：1×、2×、4×"
   }
   setSpeed(1)
 
@@ -552,7 +591,9 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     if (event.key === "2") setSpeed(2)
     if (event.key === "3") setSpeed(4)
     if (event.key === "Escape") {
-      if (ui.tool !== "select") choose("select")
+      // A stroke being drawn or held is dropped first; the tool stays.
+      if (ui.dragFrom) input.cancelStroke()
+      else if (ui.tool !== "select") choose("select")
       else if (ui.menu) ui.menu = null
       else ui.selected = null
       refreshTools()
@@ -787,7 +828,7 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     const parks = section(
       "公园",
       "decor",
-      `先铺地面，再摆放设施。相邻地面组成一座公园：设施越丰富，附近宜居度越高（市民住宅需要5，市民宅邸需要15）。每 ${parkRules.cellsPerProp} 格地面可计入一件设施。`
+      `先铺地面，再摆放设施。相连地面组成一座公园，设施越丰富，周围街区的宜居度越高（市民住宅需要 ${home.tiers[2].appeal}，市民宅邸需要 ${home.tiers[3].appeal}）。每 ${parkRules.cellsPerProp} 格地面可计入一件设施。`
     )
     parks.style.borderTop = "3px solid #4f9a6a"
     const pieces: ReadonlyArray<{ readonly id: GroundId | PropId; readonly piece: ParkPiece; readonly pick: () => void; readonly ground: boolean }> = [
@@ -864,7 +905,7 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     const treasury = section(
       "财政",
       "treasury",
-      "单位为金币/分钟。住宅获得食物供应后才纳税，税收还取决于需求满足程度。行政开支随人口增长，且增长更快；连续负债三分钟即破产。"
+      "以下为每分钟收支。有食物的住宅才缴税，税额随需求满足程度变化。行政开支按住宅计收，增长快于城镇规模：城镇较大时，新建一栋移民小屋的税收可能仅够支付新增行政开支；市民住宅和市民宅邸则能以相同的行政成本容纳两倍或三倍人口。连续负债三分钟将导致破产。"
     )
     const taxes = row(treasury, "税收", "taxes")
     const supplied = row(treasury, "需求全部满足时", "homes")
@@ -883,7 +924,7 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     const levers = section(
       "税率",
       "taxes",
-      `降低税率提高支持度，加税降低支持度，影响按各阶层人数加权。税率超过 ${moodRules.grudge.above}% 会积累怨恨，降税后仍缓慢消退；临近任期结束才降税无法抵消长期压榨。`
+      `降税提高支持度，加税降低支持度，影响按各阶层人口加权。税率超过 100% 还会使部分居民迁出，移民比市民更敏感，因此加税未必增收。下方列出各档税率稳定后的预计税收。超过 ${moodRules.grudge.above}% 会积累怨恨，即使降税也只会缓慢消退，任期末突击降税无法抹去长期重税的影响。`
     )
     for (const tier of ["settlers", "citizens"] as const) {
       const line = el("div", "row lever")
@@ -897,7 +938,9 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
       rate.input.title = "拖动调整税率；双击恢复标准税率 100%"
       rate.input.ondblclick = () => ui.edits.push({ type: "tax", tier, rate: 100 })
       const effect = el("p", "effect")
-      levers.append(line, rate.input, effect)
+      const outlook = el("p", "effect outlook")
+      outlook.title = "各档税率稳定后的每分钟住宅税收估算：超过 100% 会使部分居民迁出，税率也会影响支持度"
+      levers.append(line, rate.input, effect, outlook)
       live.push(() => {
         const now = ui.stats?.policy[tier] ?? 100
         rate.sync(now)
@@ -906,6 +949,13 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
         const grudge = now > moodRules.grudge.above ? " · 维持高税率会积累怨恨，降税后也只会缓慢消退" : ""
         effect.textContent = (sway === 0 ? "标准税率" : `支持度 ${signed(sway)}`) + grudge
         effect.className = `effect ${sway > 0 ? "up" : sway < 0 ? "down" : ""}`
+        const steps = ui.stats?.taxOutlook[tier] ?? []
+        const best = steps.reduce<{ rate: number; taxes: number } | null>((b, o) => (b === null || o.taxes > b.taxes ? o : b), null)
+        const text = steps.length === 0 || best === null
+          ? ""
+          : `稳定后税收/分钟： ${steps.map((o) => `${o.rate}% ${o.taxes}`).join(" · ")} · ${best.rate}% 时最高`
+        if (outlook.textContent !== text) outlook.textContent = text
+        outlook.style.display = text ? "" : "none"
       })
     }
     panel.append(levers)
@@ -925,7 +975,7 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     const needs = section(
       "需求满足情况",
       "homes",
-      "挨饿的住宅不纳税。移民需要市场供应食物（鲜鱼、熏鱼或面包），小屋获得面包供应后，税收增加50%；市民和富裕市民需要面包、布料及信仰。布料只配送至宜居度达到5的街区。鲜鱼和面包会逐渐腐坏，鲜鱼更快；粮仓可将腐坏速度降至五分之一。"
+      "挨饿的住宅不缴税。移民需要市场供应鲜鱼、熏鱼或面包；小屋获得面包后，税收另增 50%。每次送餐按每四位居民一份食物计算，不足四人也算一份；满员的市民住宅消耗为小屋的两倍，市民宅邸为三倍。市民和富裕市民需要面包、布料与信仰。布料只送往宜居度至少为 5 的街区。鲜鱼和面包会逐渐腐坏，鲜鱼腐坏更快；粮仓可将腐坏速度降至原来的五分之一。"
     )
     const needIcons: Readonly<Record<"food" | "bread" | "cloth" | "faith", IconName>> = {
       food: "fish",
@@ -964,7 +1014,7 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     const store = section(
       "物资与贸易",
       "trade",
-      "商人每隔几秒到访。向左拖动物资滑块，出售超过保留量的库存；向右拖动，以售价的 1.5 倍购买，最多补足保留量。离中点越远，每次交易量越大；中点表示不交易。出售压低价格，购买抬高价格。"
+      "商人每隔几秒交易一次。将滑块向左拖动，出售超过保留量的物资；向右拖动，以标价的 1.5 倍购入至保留量。拖得越远，每次交易量越大；居中时停止交易。出售使价格下降，购买使价格上涨，上涨速度为下降的三倍；高价回落也很慢。进口适合临时补缺，长期依赖进口食物会让开销不断增加。"
     )
     const reserveLine = el("div", "row lever")
     const reserveValue = el("span", "rate")
@@ -1175,7 +1225,7 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
             ? "移民：需要市场供应鲜鱼、熏鱼或面包；负责基础劳动"
             : p.tier === 2
               ? "市民：需要面包、布料、信仰，以及宜居度达到5的街区；负责技术工作"
-              : "富裕市民：居住在宜居度达到15、所有服务均覆盖的优质街区"
+              : `富裕市民：住宅位于宜居度达到 ${home.tiers[3].appeal} 的优质街区，并获得全部公共服务`
     )
     const below = el("div", "")
     below.append(status, about)
@@ -1211,6 +1261,8 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
       }
       syncLines(box, rows, now.lines)
       if (nextBox && now.type === "house") {
+        // A closed home has nobody in it to grow.
+        nextBox.style.display = now.closed ? "none" : ""
         syncLines(nextBox, nextRows, now.blockers)
         nextNote.textContent = now.blockers.length === 0 ? "升级条件已满足：下一位居民入住时升级" : ""
         nextNote.style.display = now.blockers.length === 0 ? "" : "none"
@@ -1234,8 +1286,27 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
         })
         actions.append(pause)
       }
+      if (p.type === "house") {
+        const close = el("button", "frame", "关闭住宅")
+        close.title = "关闭的住宅保持空置，不缴税，也不产生行政开支。重新开放后，居民会逐渐入住。"
+        close.onclick = () => {
+          const now = ui.panel
+          if (now?.type === "house") ui.edits.push({ type: "pause", cell: now.cell, on: !now.closed })
+        }
+        live.push(() => {
+          const now = ui.panel
+          if (now?.type !== "house") return
+          close.textContent = now.closed ? "重新开放住宅" : "关闭住宅"
+          close.style.display = now.closable ? "" : "none"
+        })
+        actions.append(close)
+      }
       const remove = el("button", "frame danger", "拆除")
       remove.onclick = () => ui.edits.push({ type: "remove", cell: p.cell })
+      live.push(() => {
+        const now = ui.panel
+        remove.title = now?.type === "building" || now?.type === "house" ? now.salvage : ""
+      })
       actions.append(remove)
       panel.append(actions)
     }
@@ -1258,6 +1329,7 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
   }
 
   // ── Founding a town ──
+  const savedTown = options.saved ?? null
   const choice: { -readonly [K in keyof CharterValue]: CharterValue[K] } = defaultCharter((Date.now() & 0x7fffffff) >>> 0)
   /** The land a charter would found, drawn small: a dot a cell. */
   const drawLand = (canvas: HTMLCanvasElement) => {
@@ -1291,35 +1363,45 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
   const openCharter = (cancellable: boolean) => {
     ui.founding = true
     dialog.replaceChildren()
-    const card = el("div", "sheet")
-    card.append(
-      el("h2", "", "建立城镇"),
-      el(
-        "p",
-        "sub",
-        "选择地图与任期长度。发展城镇，完成所有目标，或坚持到任期结束，避免破产、叛乱与衰败。"
-      )
-    )
+    const card = el("div", "sheet wide")
+    const title = el("h2", "title", "墨线小镇 ")
+    const by = el("small", "by", "作者：")
+    const author = el("a", "", "Sandro Maglione") as HTMLAnchorElement
+    author.href = "https://www.sandromaglione.com/"
+    author.target = "_blank"
+    author.rel = "noopener"
+    by.append(author)
+    title.append(by)
+    card.append(title, el("p", "sub", "选择地图，在任期结束前达成城镇发展目标。"))
     const body = el("div", "charter")
     const options = el("div", "")
     const preview = el("div", "preview")
+    const mapBox = el("div", "map")
     const map = document.createElement("canvas")
-    const facts = el("p", "sub")
-    preview.append(map, facts)
+    mapBox.append(map)
+    const facts = el("p", "note facts")
+    const cells = el("span", "ref ware cells")
+    mapBox.append(cells)
+    preview.append(mapBox, facts)
     body.append(options, preview)
+    /** A figure of the charter as the town's messages name things: an icon and a few words. */
+    const chip = (glyph: IconName, text: string) => `<span class="ref ware">${icon(glyph, 13)}${escapeHtml(text)}</span>`
     const group = <T extends string | number>(
       title: string,
+      glyph: IconName,
       values: ReadonlyArray<T>,
       label: (v: T) => string,
-      blurb: (v: T) => string,
+      note: (v: T) => string,
+      tip: (v: T) => string,
       get: () => T,
       set: (v: T) => void
     ) => {
-      const box = section(title)
+      const box = section(title, glyph)
       const row = el("div", "choices")
-      const note = el("p", "empty")
+      const said = el("p", "note")
       const buttons = values.map((v) => {
         const b = el("button", "frame choice", label(v))
+        b.title = tip(v)
         b.onclick = () => {
           set(v)
           refresh()
@@ -1327,57 +1409,63 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
         row.append(b)
         return { v, b }
       })
-      box.append(row, note)
+      box.append(row, said)
       options.append(box)
       return () => {
         for (const { v, b } of buttons) b.classList.toggle("on", v === get())
-        note.textContent = blurb(get())
+        setHtml(said, note(get()))
       }
     }
     const refreshers = [
       group(
         "地图大小",
+        "pave",
         sizeIds,
         (v) => sizes[v].title,
-        (v) => `达到 ${sizes[v].goal.residents} 位居民和 ${sizes[v].goal.coins} 金币，完成城镇建设`,
+        (v) => `目标 ${chip("people", `${sizes[v].goal.residents} 位居民`)}${chip("coins", `${sizes[v].goal.coins} 金币`)}`,
+        (v) => `完成目标： ${sizes[v].goal.residents} 位居民及 ${sizes[v].goal.coins} 金币`,
         () => choice.size,
         (v) => (choice.size = v)
       ),
       group(
         "任期",
+        "clock",
         TERMS,
         (v) => `${v} 分钟`,
-        (v) => `正常速度下任期为 ${v} 分钟，共六年；从第二年起，每年末进入冬季`,
+        (v) => `${chip("clock", `${YEARS_PER_TERM} 年，每年 ${Number((v / YEARS_PER_TERM).toFixed(1))} 分钟`)}${chip("winter", `${YEARS_PER_TERM - 1} 个冬季`)}`,
+        (v) => `正常速度下 ${v} 分钟，共 ${YEARS_PER_TERM} 年；第一年之后，每年年末迎来冬季`,
         () => choice.term,
         (v) => (choice.term = v)
       ),
       group(
         "资源丰度",
+        "wood",
         landIds,
         (v) => lands[v].title,
+        (v) => chip("coins", `初始 ${lands[v].coins} 金币`),
         (v) => lands[v].blurb,
         () => choice.land,
         (v) => (choice.land = v)
       )
     ]
-    const seedLine = el("div", "row")
-    const seedText = el("span", "")
-    const reroll = el("button", "frame", "换一张地图")
+    // The land is drawn from a seed: a fresh one on a click; the number itself only on hover, for whoever wants it.
+    const reroll = el("button", "frame reroll", "↻ 换张地图")
     reroll.onclick = () => {
       choice.seed = (Math.random() * 0x7fffffff) >>> 0
       refresh()
     }
-    seedLine.append(seedText, reroll)
-    preview.append(seedLine)
+    mapBox.append(reroll)
     const refresh = () => {
       for (const r of refreshers) r()
       const land = drawLand(map)
-      seedText.textContent = `地图种子 ${choice.seed}`
-      facts.textContent = `陆地 ${land.cells} 格 · 树木 ${land.trees.length} 棵 · 岩石 ${land.rocks.filter((r) => !r.ore).length} 处 · 矿床 ${land.rocks.filter((r) => r.ore).length} 处 · 初始资金 ${lands[choice.land].coins} 金币`
+      reroll.title = `重新生成地图（当前种子 ${choice.seed}）`
+      const rocks = land.rocks.filter((r) => !r.ore).length
+      setHtml(cells, `${icon("pave", 13)}${land.cells} 格`)
+      setHtml(facts, chip("wood", `${land.trees.length} 棵树`) + chip("stone", `${rocks} 处石料`) + chip("ore", `${land.rocks.length - rocks} 处矿石`))
     }
     refresh()
     const actions = el("div", "actions")
-    const found = el("button", "frame primary", "建立城镇")
+    const found = el("button", "frame primary", "新建城镇")
     found.onclick = () => {
       if (visiting) endVisit()
       ui.edits.push({ type: "newTown", charter: { ...choice } })
@@ -1390,6 +1478,24 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
       setSpeed(1)
     }
     actions.append(found)
+    // On the way in, a town saved in this browser: carry on with it instead.
+    if (!cancellable && savedTown) {
+      const saved = savedTown
+      const resume = el("button", "frame", "继续存档")
+      resume.title = `继续此浏览器中的存档： ${saved.title}${saved.savedAt > 0 ? `，保存于${ago(saved.savedAt)}` : ""}`
+      resume.onclick = () => {
+        const said = persistence().load() ?? "已读取"
+        ui.toast(said)
+        if (!said.startsWith("已读取")) return
+        history.length = 0
+        ui.selected = null
+        ui.menu = null
+        closeCharter()
+        choose("select")
+        setSpeed(1)
+      }
+      actions.append(resume)
+    }
     if (cancellable) {
       const cancel = el("button", "frame", "取消")
       cancel.onclick = () => closeCharter()
@@ -1634,6 +1740,15 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
   }
 
   const input = new MapInput(stage, ui)
+  // A road, a row of homes, or a patch of park let go of on a touch screen is held here until built or
+  // dropped; the tooltip says what it lays and costs.
+  const strokeBar = el("div", "stroke-bar")
+  const strokeBuild = el("button", "primary", "建造")
+  strokeBuild.onclick = () => input.confirmStroke()
+  const strokeDrop = el("button", "", "取消")
+  strokeDrop.onclick = () => input.cancelStroke()
+  strokeBar.append(strokeDrop, strokeBuild)
+  document.body.append(strokeBar)
   const resetPage = () => {
     choose("select")
     ui.menu = null
@@ -1699,8 +1814,18 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
     syncPanel()
     const s = ui.stats
     if (s) {
-      setHtml(coins, `${icon("coins", 20)}<span class="stack"><b>${s.coins}</b><small class="${s.net >= 0 ? "up" : "down"}">${s.net >= 0 ? "+" : ""}${s.net}/分钟</small></span>`)
-      coins.title = "当前财政资金，以及每分钟的盈亏"
+      // The treasury as the goods are shown: which way it went over the last minute, and by how much; the steady rate until a minute is counted.
+      const cf = s.flow?.coins ?? null
+      const change = cf ? cf.made + cf.traded - cf.used : s.net
+      const way = cf ? trendOf(cf.made, cf.used, cf.traded) : 0
+      setHtml(
+        coins,
+        `${icon("coins", 20)}<span class="stack"><b>${s.coins}${cf ? `<span class="trend ${trendClass(way)}">${trendMark(way)}</span>` : ""}</b>` +
+          `<small class="${change >= 0 ? "up" : "down"}">${change >= 0 ? "+" : ""}${change}/分钟</small></span>`
+      )
+      coins.title = cf
+        ? `国库金币 · 点击查看上分钟收支\n上分钟：${signed(change)}（收入 ${cf.made}，支出 ${cf.used}${cf.traded !== 0 ? `，贸易 ${signed(cf.traded)}` : ""}）\n按当前速率：${signed(s.net)}/分钟（税收、贸易、维护、行政）`
+        : `国库金币及当前每分钟收支 · 点击查看上分钟收支`
       coins.classList.toggle("debt", s.coins < 0)
       const left = Math.max(0, s.charter.term * 60 - Math.floor(s.minute * 60))
       const severity = (w: typeof s.season.coming) => (w === null ? "" : ` (${winters[w].title})`)
@@ -1709,7 +1834,7 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
         : s.season.coming === null
           ? "本任期不再有冬季"
           : `距离冬季 ${clockText(s.season.left)}${severity(s.season.coming)}`
-      setHtml(clock, `${icon(s.season.winter ? "winter" : "clock", 20)}<span class="stack"><b>${clockText(left)}</b><small class="${s.season.winter ? "winter" : s.season.coming === "hard" ? "down" : ""}">第 ${s.season.year} 年 · ${until}</small></span>`)
+      setHtml(clock, `${icon(s.season.winter ? "winter" : "clock", 20)}<span class="stack"><b>${clockText(left)}${ui.speed === 0 ? `<span class="paused-tag">已暂停</span>` : ""}</b><small class="${s.season.winter ? "winter" : s.season.coming === "hard" ? "down" : ""}">第 ${s.season.year} 年 · ${until}</small></span>`)
       clock.title = `${s.season.winter ? "冬季：农田停产，捕鱼减少，食物消耗加快" : "任期剩余时间"}\n年历：下个冬季为${s.season.coming === null ? "任期之外" : winters[s.season.coming].title}，再下个为${s.season.after === null ? "任期之外" : winters[s.season.after].title}。\n暖冬：捕鱼量 ${Math.round(winters.mild.fishing * 100)}%。普通冬季：${Math.round(winters.normal.fishing * 100)}%。严冬：时长增加50%，捕鱼量 ${Math.round(winters.hard.fishing * 100)}%，住宅取暖增加火灾风险。`
       const trend = s.mood.target > s.mood.approval ? "↑" : s.mood.target < s.mood.approval ? "↓" : ""
       setHtml(approval, `${icon("approval", 18)}<span class="stack"><b class="${s.mood.approval < 0 ? "down" : ""}">${signed(s.mood.approval)} <span class="${s.mood.target >= s.mood.approval ? "up" : "down"}">${trend}</span></b><small>支持度</small></span>`)
@@ -1729,8 +1854,19 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
       }
       for (const [g, count] of goodCells) {
         count.textContent = String(s.stock[g])
-        count.parentElement!.classList.toggle("empty", s.stock[g] === 0)
+        const way = s.flow ? flowTrend(s.flow, g) : 0
+        const trend = goodTrends.get(g)!
+        trend.textContent = s.flow ? trendMark(way) : ""
+        trend.className = `trend ${trendClass(way)}`
+        // Empty storage is only worth dimming when nothing is held anywhere else either.
+        count.parentElement!.classList.toggle("empty", s.stock[g] === 0 && (s.flow?.elsewhere[g] ?? 0) === 0)
+        count.parentElement!.title = `${goods[g].title}: ${goodHelp[g]}` + (s.flow
+          ? `\n上分钟：生产 ${s.flow.made[g]}，消耗 ${s.flow.used[g]}${s.flow.traded[g] !== 0 ? `, ${s.flow.traded[g] > 0 ? "买入" : "卖出"} ${Math.abs(s.flow.traded[g])}` : ""}。仓储 ${s.stock[g]}，城镇其他处 ${s.flow.elsewhere[g]}（工坊、市场和运输途中）。`
+          : "")
       }
+      // On a phone the goods chip opens the table itself, once there is a minute to show; the plain goods until then.
+      document.body.classList.toggle("flow-ready", s.flow !== null)
+      if (flowCard.classList.contains("open") || (phone.matches && fold === "goods")) setHtml(flowCard, flowHtml(s))
       // The crown's request.
       request.classList.toggle("show", s.crown.open && s.fate.state === "playing")
       if (s.crown.open) {
@@ -1841,8 +1977,13 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
       syncReckoning(s)
     }
     input.sync()
-    const screenPointer = input.pointer
-    const text = ui.preview.tooltip
+    const screenPointer = input.tip
+    // A stroke being drawn says what it lays and costs.
+    const text = ui.dragFrom && ui.stroke !== "cancel" && ui.preview.stroke ? ui.preview.stroke : ui.preview.tooltip
+    // A held touch stroke waits for its build button.
+    const held = ui.stroke === "held" && ui.preview.stroke !== null
+    strokeBar.classList.toggle("open", held)
+    document.body.classList.toggle("stroke-held", held)
     if (text && screenPointer) {
       tooltip.textContent = text
       tooltip.style.display = "block"
@@ -1852,4 +1993,49 @@ export const createHost = async (mount: HTMLElement, persistence: () => Persiste
   }
 
   return { app, stage, ui, syncPage, resetPage, input, visit, visitFailed, visiting: () => visiting }
+}
+
+/** Which way a good (or the treasury) went over the last minute: made and bought against used and sold, past a tenth of the traffic either way. */
+const trendOf = (made: number, used: number, traded: number): number => {
+  const net = made + traded - used
+  const room = Math.max(1, Math.round((made + used + Math.abs(traded)) / 10))
+  return net > room ? 1 : net < -room ? -1 : 0
+}
+const flowTrend = (flow: NonNullable<Stats["flow"]>, g: GoodId): number => trendOf(flow.made[g], flow.used[g], flow.traded[g])
+
+/** A good's way over the last minute: up, down, or holding steady. */
+const trendMark = (way: number) => (way > 0 ? "↑" : way < 0 ? "↓" : "→")
+const trendClass = (way: number) => (way > 0 ? "up" : way < 0 ? "down" : "steady")
+
+/** The goods' last minute, side by side: only the goods the town has touched. */
+const flowHtml = (s: Stats): string => {
+  const f = s.flow
+  if (f === null) return `<p class="sub">正在统计城镇物资，首批数据将在半分钟后显示……</p>`
+  const rows = goodIds.filter((g) => f.made[g] + f.used[g] + Math.abs(f.traded[g]) + s.stock[g] + f.elsewhere[g] > 0)
+  const head = `<span></span><b title="上分钟由工坊和采集建筑生产">生产</b><b title="上分钟用于食用、加工、建造，以及腐坏和交付的物资">消耗</b><b title="上分钟买入（+）或卖出（−）">交易</b><b title="存放在市政厅、仓库和粮仓中">仓储</b><b title="位于工坊、市场，或由服务人员和运输员携带">城镇其他处</b>`
+  const cell = (n: number) => `<span>${n === 0 ? `<i>–</i>` : n}</span>`
+  const signedCell = (n: number) => `<span>${n === 0 ? `<i>–</i>` : n > 0 ? `+${n}` : `−${-n}`}</span>`
+  // The treasury first: taxes and rewards made, upkeep and building used, trade's coins; it is all in storage.
+  const c = f.coins
+  const way = trendOf(c.made, c.used, c.traded)
+  const treasury = `<span class="name" title="金币">${icon("coins", 14)}<span class="label">金币</span><span class="trend ${trendClass(way)}">${trendMark(way)}</span></span>` +
+    `${cell(c.made)}${cell(c.used)}${signedCell(c.traded)}${cell(s.coins)}<span><i>–</i></span>`
+  const body = treasury + rows.map((g) => {
+    const way = flowTrend(f, g)
+    const traded = f.traded[g] === 0 ? `<i>–</i>` : f.traded[g] > 0 ? `+${f.traded[g]}` : `−${-f.traded[g]}`
+    return `<span class="name" title="${goods[g].title}">${goodIcon(g, 14)}<span class="label">${goods[g].title}</span><span class="trend ${trendClass(way)}">${trendMark(way)}</span></span>` +
+      `${cell(f.made[g])}${cell(f.used[g])}<span>${traded}</span>${cell(s.stock[g])}${cell(f.elsewhere[g])}`
+  }).join("")
+  return `<div class="flow-grid">${head}${body}</div>`
+}
+
+/** How long ago a save was made, roughly: "刚刚", "12 min ago", "3 h ago", "2 days ago". */
+const ago = (at: number): string => {
+  const minutes = Math.floor((Date.now() - at) / 60000)
+  if (minutes < 1) return "刚刚"
+  if (minutes < 60) return `${minutes} 分钟前`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} 小时前`
+  const days = Math.floor(hours / 24)
+  return days === 1 ? "昨天" : `${days} 天前`
 }
