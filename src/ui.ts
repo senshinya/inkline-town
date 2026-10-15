@@ -26,6 +26,18 @@ export interface Line {
   readonly goods?: ReadonlyArray<{ readonly good: GoodId; readonly count: number }> | undefined
 }
 
+/**
+ * A box of a panel's rows under a heading (`help` sits behind an ⓘ). Every
+ * row reads the same way: what, then a short value; a note under it only
+ * when there is something to do about it, or a line of context.
+ */
+export interface Group {
+  readonly title: string
+  readonly icon: IconName
+  readonly help?: string | undefined
+  readonly lines: ReadonlyArray<Line>
+}
+
 /** Something that needs looking at now, and where (when it is somewhere). */
 export interface Alert {
   /** A next step to take, something going wrong, or something that costs the town now. */
@@ -70,8 +82,10 @@ export type Edit =
   | { readonly type: "pause"; readonly cell: Point; readonly on: boolean }
   /** Sends the crown what it asked for. */
   | { readonly type: "deliver" }
-  /** Having completed the town, stays on to govern it to the end of the term. */
-  | { readonly type: "govern" }
+  /** Once a term has run out, stands for another: the same town, a new term. */
+  | { readonly type: "nextTerm" }
+  /** Upgrades the building on a cell where it stands (see `Kind.upgrade`). */
+  | { readonly type: "upgrade"; readonly cell: Point }
   /** Clears everything and founds a new town on the land a charter describes. */
   | { readonly type: "newTown"; readonly charter: CharterValue }
 
@@ -126,7 +140,10 @@ export type Panel =
       readonly paused: boolean
       /** What pulling it down costs and gives back: "pull down: −25 coins · 2 planks back". */
       readonly salvage: string
-      readonly lines: ReadonlyArray<Line>
+      readonly groups: ReadonlyArray<Group>
+      /** Whether it is upgraded; and the upgrade it could have, what it costs, and what keeps it from it now (`null`: nothing). */
+      readonly upgraded: boolean
+      readonly upgrade: { readonly title: string; readonly cost: string; readonly blocked: string | null } | null
     }
   | {
       readonly type: "house"
@@ -137,9 +154,10 @@ export type Panel =
       readonly closable: boolean
       readonly closed: boolean
       readonly salvage: string
-      readonly lines: ReadonlyArray<Line>
-      /** What keeps it from the next tier, a line each; empty when nothing does (or there is no next tier). */
-      readonly blockers: ReadonlyArray<Line>
+      /** How it is, in a word or two for the header ("4 residents", "hungry"), and whether that is trouble. */
+      readonly summary: string
+      readonly trouble: boolean
+      readonly groups: ReadonlyArray<Group>
     }
   | {
       readonly type: "park"
@@ -202,7 +220,7 @@ export interface Stats {
   /** Workplaces short of workers, to step through from the jobs counter. */
   readonly shortStaffed: ReadonlyArray<{ readonly id: number; readonly title: string; readonly cell: Point; readonly size: number; readonly assigned: number; readonly needed: number; readonly nobodyNear: boolean }>
   readonly charter: CharterValue
-  /** Minutes into the term. */
+  /** Minutes since the town was founded (see `fate.began` for this term's). */
   readonly minute: number
   readonly season: {
     readonly year: number
@@ -234,20 +252,28 @@ export interface Stats {
     readonly next: number
   }
   readonly fate: {
-    readonly state: "playing" | "won" | "lost" | "over"
+    readonly state: "playing" | "lost" | "over"
     readonly reason: string
-    /** Minute the term ended. */
+    /** Minute (since the founding) the term ended. */
     readonly at: number
-    readonly governing: boolean
+    /** Which term this is, from 1, and the minute (since the founding) it began. */
+    readonly term: number
+    readonly began: number
+    /** The rank the town has reached (see `ranks`), and the next one, or `null` at the top. */
+    readonly rank: number
+    readonly rankTitle: string
+    readonly nextTitle: string | null
+    /** This term's score, once it has ended. */
     readonly score: number
     /** Seconds left before each danger ends the term, or `null` when it is not threatening. */
     readonly bankrupt: number | null
     readonly revolt: number | null
-    /** Seconds the goals have to hold still, or `null` when they are not all met. */
-    readonly complete: number | null
+    /** Seconds the next rank's goals have to hold still, or `null` when they are not all met. */
+    readonly rises: number | null
     readonly peak: number
   }
-  readonly goals: ReadonlyArray<{ readonly text: string; readonly value: string; readonly met: boolean }>
+  /** The next rank's goals (see `goalsOf`): what each asks (`target`, in its own unit), how the town stands, and whether it is met. */
+  readonly goals: ReadonlyArray<{ readonly id: string; readonly target: number; readonly text: string; readonly value: string; readonly met: boolean }>
   readonly larder: number
   /**
    * Each good over the last minute: made, used (eaten, worked up, built
@@ -283,7 +309,27 @@ export interface Stats {
   readonly alerts: ReadonlyArray<Alert>
   /** The mayor's guide: the step to take now (if any, and the guide is on), and how far along it is. */
   readonly guide: {
-    readonly step: (Omit<Alert, "tone"> & { readonly key: string; readonly chapter: string; readonly goal: string }) | null
+    readonly step:
+      | (Omit<Alert, "tone"> & {
+          readonly key: string
+          readonly chapter: string
+          readonly goal: string
+          /** Why the step matters, in a sentence or two (`text` is what to do). */
+          readonly why: string
+          /** The mayor has done their part, and the town is at work on it: what is happening (`null`: not yet). */
+          readonly waiting: string | null
+          /** The town cannot build what it asks for yet: what opens it (`null`: it can). */
+          readonly locked: string | null
+          /** The next step that waits for the town to need it, and when it comes ("Next: a quarry, once stone falls below 8"). */
+          readonly next: string | null
+          /** The buildings it asks for: only these become chips that place one. */
+          readonly asks: ReadonlyArray<KindId>
+          /** The building it points at, when that stands (`id`): its name goes there rather than placing another. */
+          readonly near: KindId | null
+          /** Where it stands in the opening ("step 3 of 8"), or `null` after it. */
+          readonly count: { readonly at: number; readonly of: number } | null
+        })
+      | null
     readonly done: number
     readonly total: number
     readonly off: boolean

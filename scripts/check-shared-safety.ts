@@ -9,9 +9,9 @@ import { headless } from "../src/sim/headless.ts"
 const base = process.env.GAME_BASE_URL ?? "http://127.0.0.1:5232"
 const town = headless({ size: "small", term: 45, land: "fair", seed: 7 })
 const world = town.snapshot()
-const payload = '<img src=x onerror="window.__chronicleInjected=1">'
+const payload = '<img src=x onerror="window.__chronicleInjected=1"> [constructor] [__proto__] [toString]'
 world.resources["Town/Fate"] = { ...world.resources["Town/Fate"], state: "over", reason: "任期结束。", at: 1 }
-world.resources["Town/Chronicle"].lines.push({ tick: 0, text: payload, alarm: false, at: null })
+world.resources["Town/Chronicle"].lines.push({ tick: 0, text: payload, alarm: true, at: null })
 const file = { format: SAVE_FORMAT, version: SAVE_VERSION, slot: "manual", savedAt: Date.now(), title: "文本安全验证", world }
 const form = new FormData()
 form.append("town", new Blob([gzipSync(JSON.stringify(file))]), "town.json.gz")
@@ -24,8 +24,11 @@ const executablePath = process.env.BROWSER_EXECUTABLE_PATH ?? ["/Applications/Br
 const browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) })
 try {
   const page = await browser.newPage()
+  const errors: string[] = []
+  page.on("pageerror", error => errors.push(error.message))
   await page.goto(url)
-  await page.waitForFunction(() => document.body.classList.contains("visiting"))
+  await page.waitForFunction(() => document.body.classList.contains("visiting"), null, { timeout: 10000 })
+  assert.deepEqual(errors, [], "Unknown tool markers must remain harmless text")
   await page.locator(".dialog .chronicle").waitFor({ state: "visible" })
   assert.equal(await page.evaluate(() => (window as unknown as { __chronicleInjected?: number }).__chronicleInjected), undefined, "A shared chronicle must never execute markup")
   assert.ok((await page.locator(".dialog .chronicle").textContent())?.includes(`0:00 ${payload}`))
@@ -38,7 +41,7 @@ try {
   assert.ok((await recent.textContent())?.includes(payload))
   assert.equal(await recent.locator("img").count(), 0)
   assert.equal(await page.evaluate(() => (window as unknown as { __chronicleInjected?: number }).__chronicleInjected), undefined)
-  console.log("Shared chronicle renders as text in both panels; no script executes")
+  console.log("Shared chronicle renders as text in both panels; no script executes and unknown tool markers are harmless")
 } finally {
   await browser.close()
 }

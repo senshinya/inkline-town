@@ -5,7 +5,7 @@
  */
 import { Application, Graphics } from "pixi.js"
 
-import { drawBuilding, drawHouse, drawParkPiece, homeVariant, plate, plateHalf } from "./art.ts"
+import { drawParkPiece } from "./art.ts"
 import {
   categoryColor,
   categoryOrder,
@@ -53,13 +53,17 @@ import { GRID } from "./iso.ts"
 import { goodIcon, icon, iconEl, type IconName } from "./icons.ts"
 import { generate } from "./mapgen.ts"
 import { askOf, priceOf } from "./sim/index.ts"
-import type { Line, Stats, Tool, TradeMode, UiValue, View } from "./ui.ts"
+import type { Group, Line, Stats, Tool, TradeMode, UiValue, View } from "./ui.ts"
 import { emptyPreview } from "./ui.ts"
 import { GameScene, type CameraView } from "./render3d/scene.ts"
 import { blobOf, cardFacts, drawCard, metaOf, scaled, verdictOf } from "./share/card.ts"
 import { handheld, offerLink, offerPicture, upload } from "./share/client.ts"
 import { PICTURE_HEIGHT, PICTURE_QUALITY, PICTURE_WIDTH } from "./share/format.ts"
 import { MapInput } from "./render3d/input.ts"
+import { portrait } from "./render3d/portrait.ts"
+import { serviceBuilding } from "./asset-lab/service-upgrades.ts"
+import { makeBuilding } from "./asset-lab/buildings.ts"
+import { house } from "./asset-lab/homes.ts"
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text = "") => {
   const node = document.createElement(tag)
@@ -87,22 +91,78 @@ const namedThings: ReadonlyArray<{ readonly word: string; readonly ref: { readon
   }),
   ...goodIds.map((id) => ({ word: goods[id].title, ref: { good: id } }))
 ].sort((a, b) => b.word.length - a.word.length)
-const namedPattern = new RegExp(`(${namedThings.map((t) => t.word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})|[（(]([A-Z])[）)]`, "gi")
+/**
+ * Tools, panels, and map views a message can name in brackets ("[homes]",
+ * "[view:fire]"): a chip that picks the tool, opens the panel, or shows the
+ * view. The key goes beside it, for a keyboard (touch screens hide it).
+ */
+const toolRefs: Readonly<Record<string, { readonly label: string; readonly icon: IconName; readonly key?: string; readonly title: string }>> = {
+  select: { label: "选择", icon: "select", key: "S", title: "选择建筑或住宅查看详情" },
+  road: { label: "道路", icon: "road", key: "R", title: "道路：拖动铺设" },
+  pave: { label: "铺石", icon: "pave", key: "P", title: "铺石：沿道路拖动铺设石料" },
+  homes: { label: "住宅", icon: "homes", key: "H", title: "住宅：沿道路拖动建造一排住宅" },
+  build: { label: "建造", icon: "build", key: "B", title: "打开建造菜单" },
+  bulldoze: { label: "拆除", icon: "bulldoze", key: "X", title: "拆除格子上的建筑或设施" },
+  town: { label: "城镇", icon: "town", key: "T", title: "打开城镇面板：目标、税收与贸易" },
+  speed: { label: "倍速", icon: "clock", title: "切换速度：1×、2×、4×" },
+  pause: { label: "暂停", icon: "pause", key: "空格", title: "暂停或继续游戏" },
+  "view:appeal": { label: "宜居度视图", icon: "appeal", key: "D", title: "按宜居度着色" },
+  "view:workers": { label: "劳动力视图", icon: "workers", key: "W", title: "按劳动力分布着色" },
+  "view:fire": { label: "火灾视图", icon: "fire", key: "F", title: "按火灾风险着色" },
+  "view:health": { label: "健康视图", icon: "health", key: "A", title: "按健康风险着色" },
+  "view:order": { label: "治安视图", icon: "order", key: "O", title: "按盗窃风险着色" },
+  "view:condition": { label: "建筑状况视图", icon: "condition", key: "C", title: "按建筑状况着色" }
+}
+const namedPattern = new RegExp(
+  `(${namedThings.map((t) => t.word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})|[（(]([A-Z])[）)]|\\[([a-z]+(?::[a-z]+)?)\\]`,
+  "gi"
+)
+/** Goods as numbers name them ("2 planks", "1 plank"), and as recipes do ("flour → bread"), by title. */
+const goodWords: ReadonlyArray<readonly [string, GoodId]> = [
+  ...goodIds.map((id) => [goods[id].title, id] as const),
+  ...goodIds.filter((id) => goods[id].title.endsWith("s")).map((id) => [goods[id].title.slice(0, -1), id] as const)
+].sort((a, b) => b[0].length - a[0].length)
+const goodAlternatives = goodWords.map(([w]) => w).join("|")
+const goodOf = (word: string) => goodWords.find(([w]) => w === word)![1]
+/**
+ * Amounts in a line of (escaped) text as icons, where the icon says it as
+ * well as the word: "3 coins a minute" as a coin and 3/min, "2 planks" as a
+ * plank and 2, "flour → bread" with each good's icon.
+ */
+const iconize = (html: string): string =>
+  html
+    .replace(/([+−-]?)(\d+) 金币\/分钟/g, (_, sign: string, n: string) => `<span class="amount">${sign}${icon("coins", 13)}${n}/分钟</span>`)
+    .replace(/(\d+) 金币/g, (_, n: string) => `<span class="amount">${icon("coins", 13)}${n}</span>`)
+    .replace(new RegExp(`(\\d+) (${goodAlternatives})`, "g"), (_, n: string, w: string) => `<span class="amount">${goodIcon(goodOf(w), 13)}${n}</span>`)
+    .replace(new RegExp(`(${goodAlternatives}) → (${goodAlternatives})`, "g"), (_, a: string, b: string) => `<span class="amount">${goodIcon(goodOf(a), 13)}${a}</span> → <span class="amount">${goodIcon(goodOf(b), 13)}${b}</span>`)
+    .replace(/<\/span> · <span class="amount">/g, '</span> <span class="amount">')
+
+/** A finger rather than a mouse: messages say "tap", and keys are left out. */
+const touchScreen = () => matchMedia("(pointer: coarse)").matches
+/** `{tap|click}`: the first on a touch screen, the second with a mouse. */
+const forDevice = (text: string) => text.replace(/\{([^{}|]*)\|([^{}|]*)\}/g, (_, touch: string, mouse: string) => (touchScreen() ? touch : mouse))
 
 /**
  * A message as markup: each building it names becomes a chip to click (to
- * build one), each good a chip with its icon, and each key in brackets a key.
+ * build one), each good a chip with its icon, each key in round brackets a
+ * key, and each tool in square brackets a chip that picks it.
+ * `standing`: buildings the line is about, which stand already; their chips go to them rather than placing another.
+ * `asks`: when given, only these buildings become chips to place one; others it names are plain words.
  */
-/** `standing`: buildings the line is about, which stand already; their chips go to them rather than placing another. */
-const callouts = (text: string, standing: ReadonlySet<KindId> = new Set()): string =>
-  escapeHtml(text).replace(namedPattern, (match, word: string | undefined, key: string | undefined) => {
+const callouts = (text: string, standing: ReadonlySet<KindId> = new Set(), asks?: ReadonlySet<KindId>): string =>
+  escapeHtml(forDevice(text)).replace(namedPattern, (match, word: string | undefined, key: string | undefined, tool: string | undefined) => {
     if (key) return `<kbd class="key">${key}</kbd>`
+    if (tool) {
+      const ref = Object.hasOwn(toolRefs, tool) ? toolRefs[tool] : undefined
+      if (!ref) return match
+      return `<button class="ref tool" data-tool="${tool}" title="${escapeHtml(ref.title)}">${icon(ref.icon, 13)}${ref.label}${ref.key ? `<kbd>${ref.key}</kbd>` : ""}</button>`
+    }
     const thing = namedThings.find((t) => t.word === word!.toLowerCase())
     if (!thing) return match
     if ("good" in thing.ref) return `<span class="ref ware" title="${goods[thing.ref.good].title}">${goodIcon(thing.ref.good, 13)}${match}</span>`
     const kind = kinds[thing.ref.kind]
     if (standing.has(thing.ref.kind)) return `<button class="ref kind go" data-go="${thing.ref.kind}" title="定位${kind.title}">${icon("locate", 13)}${match}</button>`
-    return kind.buildable
+    return kind.buildable && (!asks || asks.has(thing.ref.kind))
       ? `<button class="ref kind" data-kind="${thing.ref.kind}" title="建造${kind.title}：${escapeHtml(kind.blurb)}">${icon("build", 13)}${match}</button>`
       : `<span class="ref kind" title="${escapeHtml(kind.blurb)}">${icon("town", 13)}${match}</span>`
   })
@@ -183,7 +243,7 @@ export const createHost = async (
     }
     stock.append(cell)
   }
-  // The crown's request, when there is one, and what threatens (or is about to complete) the term.
+  // The crown's request, when there is one, and what threatens the term (or is about to raise the town a rank).
   const request = el("div", "card request")
   const requestText = el("div", "cell")
   const send = el("button", "send", "交付")
@@ -311,6 +371,11 @@ export const createHost = async (
     if (mapPress?.id === e.pointerId && Math.hypot(e.clientX - mapPress.x, e.clientY - mapPress.y) > 8) mapPress.moved = true
   })
   mount.addEventListener("pointerup", (e) => {
+    // A tap on the map puts a toast away (one it raised itself stays): a pan or a pinch, to look for the spot, does not.
+    if (mapPress?.id === e.pointerId && !mapPress.moved && toastBox.classList.contains("show") && Date.now() - toastAt > 250) {
+      window.clearTimeout(toastTimer)
+      toastBox.classList.remove("show")
+    }
     if (mapPress?.id === e.pointerId && !mapPress.moved && fold !== null) setFold(null)
     if (mapPress?.id === e.pointerId) mapPress = null
   })
@@ -323,6 +388,8 @@ export const createHost = async (
   }
 
   let toastTimer = 0
+  /** When the toast showing went up: a press on the map just after does not put it away. */
+  let toastAt = 0
   const ui: UiValue = {
     tool: "select",
     placing: null,
@@ -348,11 +415,14 @@ export const createHost = async (
     tints: new Map(),
     legend: null,
     flash: null,
+    // Long enough to read (about 15 letters a second, and a moment to look), and gone as soon as the mayor
+    // touches the map again: by then they have read it, or are acting on it.
     toast: (message) => {
-      toastBox.textContent = message
+      toastBox.innerHTML = iconize(escapeHtml(message))
       toastBox.classList.add("show")
+      toastAt = Date.now()
       window.clearTimeout(toastTimer)
-      toastTimer = window.setTimeout(() => toastBox.classList.remove("show"), 1800)
+      toastTimer = window.setTimeout(() => toastBox.classList.remove("show"), Math.min(8000, Math.max(2200, 1200 + message.length * 65)))
     }
   }
 
@@ -561,19 +631,22 @@ export const createHost = async (
     ui.placing = kind
     ui.menu = null
     choose("place")
-    ui.toast(`点击放置${kinds[kind].title.toLowerCase()} · Esc 取消`)
+    const title = kinds[kind].title.toLowerCase()
+    ui.toast(touchScreen() ? `轻点预览${title}的位置，再次轻点确认建造` : `点击放置${title} · Esc 取消`)
   }
   const layGround = (ground: GroundId) => {
     ui.ground = ground
     ui.menu = null
     choose("ground")
-    ui.toast(`拖出矩形铺设${grounds[ground].title.toLowerCase()} · Esc 取消`)
+    const title = grounds[ground].title.toLowerCase()
+    ui.toast(touchScreen() ? `拖出矩形铺设${title}，然后轻点“建造”` : `拖出矩形铺设${title} · Esc 取消`)
   }
   const furnish = (prop: PropId) => {
     ui.prop = prop
     ui.menu = null
     choose("prop")
-    ui.toast(`点击公园格子摆放${props[prop].title.toLowerCase()} · Esc 取消`)
+    const title = props[prop].title.toLowerCase()
+    ui.toast(touchScreen() ? `轻点公园格子预览${title}，再次轻点确认摆放` : `点击公园格子摆放${title} · Esc 取消`)
   }
   choose("select")
 
@@ -643,26 +716,38 @@ export const createHost = async (
 
   // ── Pictures of buildings, for the build menu and the panel ──
   const pictures = new Map<string, Promise<string>>()
-  /** A building (or a home of a tier) drawn as the town draws it, as an image. */
-  const picture = (what: KindId | Tier | `park:${GroundId | PropId}`): HTMLImageElement => {
+  /**
+   * A building (or a home of a tier) drawn as the town draws it, as an image.
+   * An upgraded market or chapel has no 2D drawing: its model is pictured
+   * from the town's camera instead (see `portrait`).
+   */
+  /**
+   * Pictures for the build menu and the panel. A building or a home is its 3D model, as the town draws it,
+   * turned to the town's camera (see `portrait`), so the picture matches what stands on the map; one model
+   * a frame, so a menu of them does not stall the page. A park piece is its drawing.
+   */
+  let portraits: Promise<unknown> = Promise.resolve()
+  const modelPicture = (make: () => Parameters<typeof portrait>[0]): Promise<string> => {
+    const url = portraits.then(() => new Promise<string>((done) => requestAnimationFrame(() => done(portrait(make())))))
+    portraits = url.catch(() => undefined)
+    return url
+  }
+  const both = { right: true, left: true }
+  const picture = (what: KindId | Tier | `park:${GroundId | PropId}`, upgraded = false): HTMLImageElement => {
     const img = document.createElement("img")
     img.className = "thumb"
     img.alt = ""
-    const id = String(what)
+    const id = `${String(what)}${upgraded ? "/upgraded" : ""}`
     let url = pictures.get(id)
     if (!url) {
-      const g = new Graphics()
-      if (typeof what === "string" && what.startsWith("park:")) drawParkPiece(g, what.slice(5) as GroundId | PropId)
-      else if (what === 1 || what === 2 || what === 3) {
-        plate(g, plateHalf(1))
-        drawHouse(g, what, 1, { right: true, left: false }, homeVariant(0.1))
-      } else {
-        const kind = kinds[what as KindId]
-        plate(g, plateHalf(kind.size))
-        drawBuilding(g, kind, 1, 0, 0.6, { right: true, left: true })
-      }
-      url = app.renderer.extract.base64({ target: g, resolution: 2 })
-      void url.finally(() => g.destroy())
+      if (typeof what === "string" && what.startsWith("park:")) {
+        const g = new Graphics()
+        drawParkPiece(g, what.slice(5) as GroundId | PropId)
+        url = app.renderer.extract.base64({ target: g, resolution: 2 })
+        void url.finally(() => g.destroy())
+      } else if (what === 1 || what === 2 || what === 3) url = modelPicture(() => house(what, undefined, undefined, { doors: { right: true } }))
+      else if (upgraded && (what === "market" || what === "chapel")) url = modelPicture(() => serviceBuilding(what, 2, { doors: both }))
+      else url = modelPicture(() => makeBuilding(what as KindId, { doors: both, motion: false }))
       pictures.set(id, url)
     }
     void url.then((src) => (img.src = src))
@@ -787,7 +872,7 @@ export const createHost = async (
   }
 
   const buildMenu = () => {
-    panel.append(header("建造", iconEl("build", 30), el("p", "sub", "选择项目，再点击地图 · Esc 取消")))
+    panel.append(header("建造", iconEl("build", 30), el("p", "sub", touchScreen() ? "选择建筑，再轻点地图预览位置" : "选择建筑，再点击地图放置 · Esc 取消")))
     for (const category of categoryOrder) {
       const options = kindOrder.filter((id) => kinds[id].category === category && kinds[id].buildable)
       if (options.length === 0) continue
@@ -881,8 +966,12 @@ export const createHost = async (
     const sub = el("p", "sub")
     panel.append(header("城镇", iconEl("town", 30), sub))
 
-    // The goals that complete the town, and how near each one is.
-    const goals = section("目标", "goal", "同时达成所有目标并维持两分钟，即可完成城镇建设。")
+    // The town's rank, the goals that raise it to the next, and how near each one is.
+    const goals = section(
+      "goals",
+      "goal",
+      "城镇由聚落逐步发展为村庄、城镇和城市。同时满足下一级的全部目标并保持两分钟，即可晋级并获得王室奖励。晋级不会结束游戏，已获得的等级也不会降低。"
+    )
     const goalRows: Array<{ line: HTMLElement; mark: HTMLElement; text: HTMLElement; value: HTMLElement }> = []
     const goalNote = el("p", "empty")
     panel.append(goals)
@@ -1060,7 +1149,7 @@ export const createHost = async (
     live.push(() => {
       const s = ui.stats
       if (!s) return
-      sub.textContent = `${sizes[s.charter.size].title}地图，资源${lands[s.charter.land].title} · 任期 ${s.charter.term} 分钟`
+      sub.textContent = `${sizes[s.charter.size].title}地图，资源${lands[s.charter.land].title} · ${s.fate.rankTitle} · 第 ${s.fate.term} 届任期，${s.charter.term} 分钟`
       sub.title = `地图种子 ${s.charter.seed}`
       // Goals.
       while (goalRows.length < s.goals.length) {
@@ -1075,17 +1164,18 @@ export const createHost = async (
         goalRows.push({ line, mark, text, value })
       }
       goals.append(goalNote)
+      goalRows.forEach((r, i) => (r.line.style.display = i < s.goals.length ? "" : "none"))
       s.goals.forEach((g, i) => {
         const r = goalRows[i]!
         r.line.classList.toggle("met", g.met)
         r.text.textContent = g.text
         r.value.textContent = g.value
       })
-      goalNote.textContent = s.fate.governing
-        ? "建设完成：市长将继续执政至任期结束。"
-        : s.fate.complete !== null
-          ? `所有目标已达成：还需维持 ${clockText(s.fate.complete)}。`
-          : ""
+      goalNote.textContent = s.fate.nextTitle === null
+        ? `当前等级：${s.fate.rankTitle}，已达最高等级。继续执政，让城镇长久繁荣。`
+        : s.fate.rises !== null
+          ? `目标全部达成：再维持 ${clockText(s.fate.rises)}，即可从${s.fate.rankTitle}晋升为${s.fate.nextTitle}。`
+          : `当前等级：${s.fate.rankTitle}。完成以下目标可晋升为${s.fate.nextTitle}。`
       goalNote.style.display = goalNote.textContent ? "" : "none"
       // Approval.
       moodValue.textContent = `${signed(s.mood.approval)} → ${signed(s.mood.target)}`
@@ -1177,13 +1267,14 @@ export const createHost = async (
 
   /** A line of a description as a row: its icon and what it is about, its value, any goods as chips, and a note underneath saying why. */
   const renderLine = (row: HTMLElement, l: Line) => {
-    // A value too long to sit beside the label goes under it, aligned with it.
-    row.className = `line ${l.tone ?? ""}${(l.value ?? "").length > 14 ? " long" : ""}`
+    // Every row the same way: what on the left, its value on the right, any note under both.
+    row.className = `line ${l.tone ?? ""}`
     const chips = l.goods ? `<span class="chips">${l.goods.map((g) => `<span class="chip" title="${goods[g.good].title}">${goodIcon(g.good, 14)}${g.count}</span>`).join("")}</span>` : ""
-    row.innerHTML = `<span class="mark">${icon(l.icon, 16)}</span><span class="what"></span><span class="count"></span>${chips}${l.note ? `<small class="note"></small>` : ""}`
+    // Goods take the value's place: chips on the right.
+    row.innerHTML = `<span class="mark">${icon(l.icon, 16)}</span><span class="what"></span>${chips || `<span class="count"></span>`}${l.note ? `<small class="note"></small>` : ""}`
     row.querySelector<HTMLElement>(".what")!.textContent = l.label
-    row.querySelector<HTMLElement>(".count")!.textContent = l.value ?? ""
-    if (l.note) row.querySelector<HTMLElement>(".note")!.textContent = l.note
+    if (!chips) row.querySelector<HTMLElement>(".count")!.innerHTML = iconize(escapeHtml(l.value ?? ""))
+    if (l.note) row.querySelector<HTMLElement>(".note")!.innerHTML = iconize(escapeHtml(l.note))
   }
   /** Keeps a box of rows in step with its lines, touching only the rows that changed. */
   const syncLines = (box: HTMLElement, rows: Array<HTMLElement>, lines: ReadonlyArray<Line>) => {
@@ -1210,38 +1301,49 @@ export const createHost = async (
     if (p.type === "build") return buildMenu()
     if (p.type === "town") return townPanel()
 
-    const title = p.type === "building" ? kinds[p.kind].title.toLowerCase() : p.type === "house" ? tierHome[p.tier] : p.type === "park" ? "公园" : "废墟"
+    const upgrade = p.type === "building" && p.upgraded ? kinds[p.kind].upgrade : undefined
+    const title = p.type === "building" ? (upgrade ?? kinds[p.kind]).title.toLowerCase() : p.type === "house" ? tierHome[p.tier] : p.type === "park" ? "公园" : "废墟"
     const status = el("span", "pill")
     const about = el(
       "p",
       "sub",
       p.type === "building"
-        ? kinds[p.kind].blurb
+        ? (upgrade ?? kinds[p.kind]).blurb
         : p.type === "ruin"
           ? "拆除废墟以清理地块"
           : p.type === "park"
             ? "所有相连地块组成这座公园；扩建地面或摆放设施，提高附近街区的宜居度"
           : p.tier === 1
-            ? "移民：需要市场供应鲜鱼、熏鱼或面包；负责基础劳动"
+            ? "移民居住于此，负责基础劳动"
             : p.tier === 2
-              ? "市民：需要面包、布料、信仰，以及宜居度达到5的街区；负责技术工作"
-              : `富裕市民：住宅位于宜居度达到 ${home.tiers[3].appeal} 的优质街区，并获得全部公共服务`
+              ? "市民居住于此，负责技术工作，人均基础税额为移民的两倍"
+              : "富裕市民居住于此，基础税额最高"
     )
     const below = el("div", "")
     below.append(status, about)
-    panel.append(header(title, p.type === "ruin" ? iconEl("condition", 30) : p.type === "park" ? iconEl("decor", 30) : picture(p.type === "building" ? p.kind : p.tier), below))
-    const box = section(p.type === "building" ? "运行情况" : p.type === "ruin" ? "残留情况" : p.type === "park" ? "公园构成" : "住户", p.type === "building" ? "jobs" : p.type === "park" ? "appeal" : "homes")
-    box.classList.add("lines")
-    const rows: Array<HTMLElement> = []
-    panel.append(box)
-    // A home: what keeps it from the next tier, in its own box, so the cause is never a word in a longer line.
-    const nextBox = p.type === "house" && p.tier < 3 ? section(`升级为${tierHome[(p.tier + 1) as Tier]}`, "citizens", "满足以下全部条件后住宅才能升级。需求由服务人员满足，宜居度由周围环境决定。") : null
-    const nextRows: Array<HTMLElement> = []
-    const nextNote = el("p", "empty")
-    if (nextBox) {
-      nextBox.classList.add("lines")
-      nextBox.append(nextNote)
-      panel.append(nextBox)
+    panel.append(header(title, p.type === "ruin" ? iconEl("condition", 30) : p.type === "park" ? iconEl("decor", 30) : picture(p.type === "building" ? p.kind : p.tier, p.type === "building" && p.upgraded), below))
+    // A building or a home: its rows in boxes under headings, kept in step with what the town says each frame.
+    // A park or a ruin: one box.
+    const holder = el("div", "")
+    panel.append(holder)
+    const slots: Array<{ box: HTMLElement; rows: Array<HTMLElement>; key: string }> = []
+    const syncGroups = (groups: ReadonlyArray<Group>) => {
+      groups.forEach((g, i) => {
+        const key = `${g.title}|${g.icon}|${g.help ?? ""}`
+        let slot = slots[i]
+        if (!slot || slot.key !== key) {
+          const box = section(g.title, g.icon, g.help)
+          box.classList.add("lines")
+          const fresh = { box, rows: [] as Array<HTMLElement>, key }
+          if (slot) slot.box.replaceWith(box)
+          else holder.append(box)
+          slots[i] = fresh
+          slot = fresh
+        }
+        slot.box.style.display = ""
+        syncLines(slot.box, slot.rows, g.lines)
+      })
+      for (const extra of slots.slice(groups.length)) extra.box.style.display = "none"
     }
     live.push(() => {
       const now = ui.panel
@@ -1249,24 +1351,19 @@ export const createHost = async (
       if (now.type === "building") {
         status.textContent = now.problem ?? { working: "工作中", idle: "空闲", blocked: "库存已满", unconnected: "未连接道路", unstaffed: "缺少工人", starved: "缺少原料", building: "施工中", paused: "已暂停" }[now.status]
         status.className = `pill ${now.problem !== null ? "problem" : now.status === "working" ? "working" : ""}`
+        syncGroups(now.groups)
       } else if (now.type === "house") {
-        status.textContent = `最多 ${home.tiers[now.tier].residents} 人`
-        status.className = "pill working"
+        status.textContent = now.summary
+        status.className = `pill ${now.trouble ? "problem" : "working"}`
+        syncGroups(now.groups)
       } else if (now.type === "park") {
         status.textContent = `${now.value > 0 ? "+" : ""}${now.value}，影响 ${now.reach} 格`
         status.className = "pill working"
+        syncGroups([{ title: "构成与效果", icon: "appeal", lines: now.lines }])
       } else {
         status.textContent = { burnt: "烧毁", collapsed: "坍塌", derelict: "荒废" }[now.cause]
         status.className = "pill problem"
-      }
-      syncLines(box, rows, now.lines)
-      if (nextBox && now.type === "house") {
-        // A closed home has nobody in it to grow.
-        nextBox.style.display = now.closed ? "none" : ""
-        syncLines(nextBox, nextRows, now.blockers)
-        nextNote.textContent = now.blockers.length === 0 ? "升级条件已满足：下一位居民入住时升级" : ""
-        nextNote.style.display = now.blockers.length === 0 ? "" : "none"
-        nextBox.append(nextNote)
+        syncGroups([{ title: "残留情况", icon: "condition", lines: now.lines }])
       }
     })
     if (!(p.type === "building" && p.kind === "townhall")) {
@@ -1285,6 +1382,21 @@ export const createHost = async (
           pause.style.display = now.pausable ? "" : "none"
         })
         actions.append(pause)
+        // A building that can be upgraded where it stands (see `Kind.upgrade`).
+        if (p.upgrade) {
+          const up = el("button", "frame primary", `升级为${p.upgrade.title.toLowerCase()}`)
+          up.onclick = () => {
+            const now = ui.panel
+            if (now?.type === "building") ui.edits.push({ type: "upgrade", cell: now.cell })
+          }
+          live.push(() => {
+            const now = ui.panel
+            if (now?.type !== "building" || !now.upgrade) return
+            up.disabled = now.upgrade.blocked !== null
+            up.title = `${kinds[now.kind].upgrade?.blurb ?? ""} · ${now.upgrade.cost}${now.upgrade.blocked ? ` · ${now.upgrade.blocked}` : ""}`
+          })
+          actions.append(up)
+        }
       }
       if (p.type === "house") {
         const close = el("button", "frame", "关闭住宅")
@@ -1316,7 +1428,11 @@ export const createHost = async (
   const syncPanel = () => {
     const p = ui.panel
     const next =
-      p === null ? "" : p.type === "build" || p.type === "town" ? p.type : `${p.type}|${p.id}|${p.type === "house" ? p.tier : ""}`
+      p === null
+        ? ""
+        : p.type === "build" || p.type === "town"
+          ? p.type
+          : `${p.type}|${p.id}|${p.type === "house" ? p.tier : p.type === "building" ? `${p.upgraded}|${p.upgrade !== null}` : ""}`
     if (next !== shape) {
       shape = next
       // Keep the old contents while the closed panel slides away.
@@ -1422,8 +1538,8 @@ export const createHost = async (
         "pave",
         sizeIds,
         (v) => sizes[v].title,
-        (v) => `目标 ${chip("people", `${sizes[v].goal.residents} 位居民`)}${chip("coins", `${sizes[v].goal.coins} 金币`)}`,
-        (v) => `完成目标： ${sizes[v].goal.residents} 位居民及 ${sizes[v].goal.coins} 金币`,
+        (v) => `城镇等级目标 ${chip("people", `${sizes[v].goal.residents} 位居民`)}${chip("coins", `${sizes[v].goal.coins} 金币`)}`,
+        (v) => `城镇等级需要 ${sizes[v].goal.residents} 位居民与 ${sizes[v].goal.coins} 金币；村庄要求较低，城市要求更高`,
         () => choice.size,
         (v) => (choice.size = v)
       ),
@@ -1538,7 +1654,7 @@ export const createHost = async (
       setSpeed(shareSpeed)
       return ui.toast(error instanceof Error ? error.message : "无法生成图片")
     }
-    const name = `inkline-town-${s.fate.state === "playing" ? `year-${s.season.year}` : s.fate.state === "won" ? "complete" : "reckoning"}.png`
+    const name = `inkline-town-${s.fate.state === "playing" ? `year-${s.season.year}` : `term-${s.fate.term}`}.png`
     const caption = `${metaOf(facts).title} · ${metaOf(facts).description}`
     shareBox.replaceChildren()
     const sheet = el("div", "sheet")
@@ -1640,24 +1756,28 @@ export const createHost = async (
   const chart = (s: Stats): string => {
     const w = 520
     const h = 150
-    const end = Math.max(s.charter.term * 3600, ...s.history.map((p) => p.tick))
+    const from = s.fate.began * 3600
+    const span = s.charter.term * 3600
+    const history = s.history.filter((p) => p.tick >= from)
     const line = (values: ReadonlyArray<number>, lo: number, hi: number, color: string, dash = "") => {
       if (values.length < 2) return ""
-      const span = hi - lo || 1
-      const points = s.history
-        .map((p, i) => `${((p.tick / end) * w).toFixed(1)},${(h - 4 - ((values[i]! - lo) / span) * (h - 8)).toFixed(1)}`)
+      const range = hi - lo || 1
+      const points = history
+        .map((p, i) => `${(((p.tick - from) / span) * w).toFixed(1)},${(h - 4 - ((values[i]! - lo) / range) * (h - 8)).toFixed(1)}`)
         .join(" ")
       return `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.5" stroke-dasharray="${dash}" vector-effect="non-scaling-stroke"/>`
     }
-    const residents = s.history.map((p) => p.residents)
-    const coinsLine = s.history.map((p) => p.coins)
-    const approvalLine = s.history.map((p) => p.approval)
-    const top = Math.max(1, ...residents, sizes[s.charter.size].goal.residents)
-    const goal = h - 4 - (sizes[s.charter.size].goal.residents / top) * (h - 8)
-    const winters = Array.from({ length: 5 }, (_, i) => {
-      const y = i + 1
-      const from = ((y + 0.7) / 6) * w
-      return `<rect x="${from.toFixed(1)}" y="0" width="${((w * 0.3) / 6).toFixed(1)}" height="${h}" fill="#3d6db5" opacity="0.06"/>`
+    const residents = history.map((p) => p.residents)
+    const coinsLine = history.map((p) => p.coins)
+    const approvalLine = history.map((p) => p.approval)
+    const target = s.goals.find((g) => g.id === "residents")?.target ?? sizes[s.charter.size].goal.residents
+    const top = Math.max(1, ...residents, target)
+    const goal = h - 4 - (target / top) * (h - 8)
+    // The first term spares its first year a winter; later terms do not.
+    const winters = Array.from({ length: 6 }, (_, y) => {
+      if (y === 0 && s.fate.term === 1) return ""
+      const at = ((y + 0.7) / 6) * w
+      return `<rect x="${at.toFixed(1)}" y="0" width="${((w * 0.3) / 6).toFixed(1)}" height="${h}" fill="#3d6db5" opacity="0.06"/>`
     }).join("")
     return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${winters}<line x1="0" x2="${w}" y1="${goal}" y2="${goal}" stroke="#77817a" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>${line(coinsLine, Math.min(0, ...coinsLine), Math.max(1, ...coinsLine), "#d6ae2e")}${line(approvalLine, -100, 100, "#3d6db5", "4 3")}${line(residents, 0, top, "#3d4943")}</svg>`
   }
@@ -1676,20 +1796,10 @@ export const createHost = async (
       return
     }
     const id = `${s.charter.seed}|${s.fate.state}|${s.fate.at}`
-    result.textContent =
-      s.fate.state === "won"
-        ? "城镇建设完成 · 查看结算"
-        : s.fate.state === "lost"
-          ? "任期失败 · 查看结算"
-          : "任期结束 · 查看结算"
+    result.textContent = s.fate.state === "lost" ? "任期失败 · 查看原因" : `第 ${s.fate.term} 届任期结束 · 查看结算`
     if (id === reckoned) return
     reckoned = id
-    const title =
-      s.fate.state === "won"
-        ? "城镇建设完成"
-        : s.fate.state === "lost"
-          ? s.fate.reason.split(/[:：]/)[0]!.toLowerCase()
-          : `任期结束：${verdictOf(s)}`
+    const title = s.fate.state === "lost" ? s.fate.reason.split(/[:：]/)[0]!.toLowerCase() : `第 ${s.fate.term} 届任期结束：${verdictOf(s)}`
     reckoning.replaceChildren()
     const card = el("div", "sheet wide")
     card.append(el("h2", "", title), el("p", "sub", s.fate.reason))
@@ -1699,9 +1809,10 @@ export const createHost = async (
       f.append(el("b", "", value), el("span", "", label))
       facts.append(f)
     }
+    fact("城镇等级", s.fate.rankTitle)
     fact("执政分钟数", `${Math.round(s.fate.at)}`)
     fact("居民", `${s.settlers + s.citizens}`)
-    fact("市民", `${s.citizens}`)
+    fact("市民 · 富裕市民", `${s.citizens} · ${s.burghers}`)
     fact("金币", `${s.coins}`)
     fact("支持度", signed(s.mood.approval))
     fact("王室交付 · 逾期", `${s.crown.met} · ${s.crown.missed}`)
@@ -1709,21 +1820,25 @@ export const createHost = async (
     card.append(facts)
     const graph = el("div", "chart")
     graph.innerHTML = chart(s)
-    card.append(graph, el("p", "legend", "— 居民（虚线为目标） · 金币 · - - 支持度 · 阴影为冬季"))
+    card.append(graph, el("p", "legend", "— 人口（虚线为下一级目标） · 金币 · - - 支持度 · 阴影为冬季"))
     const story = el("div", "chronicle")
-    story.innerHTML = s.chronicle.map((l) => `<p><b>${clockText(Math.round(l.tick / 60))}</b> ${escapeHtml(l.text)}</p>`).join("")
+    story.innerHTML = s.chronicle
+      .filter((l) => l.tick >= s.fate.began * 3600)
+      // Timed from the start of this term, as its chart is.
+      .map((l) => `<p><b>${clockText(Math.round((l.tick - s.fate.began * 3600) / 60))}</b> ${escapeHtml(l.text)}</p>`)
+      .join("")
     card.append(story)
     const actions = el("div", "actions")
-    if (s.fate.state === "won") {
-      const govern = el("button", "frame primary", "继续执政")
-      govern.title = "城镇建设已完成，继续执政至任期结束"
-      govern.onclick = () => {
-        ui.edits.push({ type: "govern" })
+    if (s.fate.state === "over") {
+      const stand = el("button", "frame primary", "下一任期")
+      stand.title = `继续执政 ${s.charter.term} 分钟：保留城镇，重新生成冬季，王室要求从较少物资重新开始`
+      stand.onclick = () => {
+        ui.edits.push({ type: "nextTerm" })
         showReckoning(false)
       }
-      actions.append(govern)
+      actions.append(stand)
     }
-    const again = el("button", "frame" + (s.fate.state === "won" ? "" : " primary"), "建立新城镇")
+    const again = el("button", "frame" + (s.fate.state === "over" ? "" : " primary"), s.fate.state === "over" ? "卸任并新建城镇" : "建立新城镇")
     again.onclick = () => {
       showReckoning(false)
       openCharter(true)
@@ -1756,14 +1871,36 @@ export const createHost = async (
     input.reset()
   }
 
+  /** What a tool chip in a message does (see `toolRefs`): picks the tool, opens the panel, or shows the map view. */
+  const useTool = (id: string) => {
+    setFold(null)
+    if (id.startsWith("view:")) {
+      const view = id.slice(5) as View
+      return setView(ui.view === view ? "none" : view)
+    }
+    if (id === "build" || id === "town") return ui.menu === id ? undefined : toggleMenu(id)
+    if (id === "speed") return setSpeed(ui.speed === 0 ? lastSpeed : ui.speed === 4 ? 1 : ui.speed * 2)
+    if (id === "pause") return setSpeed(ui.speed === 0 ? lastSpeed : 0)
+    ui.menu = null
+    choose(id === "homes" ? "home" : (id as Tool))
+  }
   /** Ticker lines the mayor has put away, by what they say (and, for news, when). */
   const dismissed = new Set<string>()
   let tickerLines: { guide: Stats["guide"]["step"]; alerts: Stats["alerts"]; news: Stats["chronicle"] } = { guide: null, alerts: [], news: [] }
   ticker.onclick = (event) => {
     event.stopPropagation()
-    // On a phone the peeking line opens the guide in full.
-    if (ticker.classList.contains("peek")) return setFold("guide")
     const target = event.target as HTMLElement
+    // A tool, panel, or map view the line names: pick it, with the map in view.
+    const tool = target.closest<HTMLElement>("[data-tool]")
+    if (tool) return useTool(tool.dataset.tool!)
+    // On a phone: tuck the step away into the bulb, or open the guide in full.
+    if (target.closest("[data-tuck]")) {
+      tucked = stepNow
+      if (!toldWhere) ui.toast("引导已收起，可轻点右上角灯泡重新查看")
+      toldWhere = true
+      return
+    }
+    if (ticker.classList.contains("peek") && !target.closest("[data-kind]")) return setFold("guide")
     const off = target.closest<HTMLElement>("[data-dismiss]")
     if (off) {
       dismissed.add(off.dataset.dismiss!)
@@ -1786,13 +1923,19 @@ export const createHost = async (
       const row = go.closest<HTMLElement>("[data-alert]")
       const there = row ? tickerLines.alerts[Number(row.dataset.alert)]?.places?.[go.dataset.go as KindId] : undefined
       if (there) goTo(there.at, there.size, there.id)
+      // The guide's step names the building it points at.
+      const guide = tickerLines.guide
+      if (!row && go.closest("[data-guide]") && guide?.at) goTo(guide.at, guide.size, guide.id)
       return
     }
     const ref = target.closest<HTMLElement>("[data-kind]")
     if (ref) {
       const kind = ref.dataset.kind as KindId
-      // Straight to placing it: the placement itself says if the town cannot build it yet.
-      if (kinds[kind].buildable) place(kind)
+      // Straight to placing it, with the map in view: the placement itself says if the town cannot build it yet.
+      if (kinds[kind].buildable) {
+        setFold(null)
+        place(kind)
+      }
       return
     }
     const line = target.closest<HTMLElement>(".cell.place")
@@ -1806,9 +1949,14 @@ export const createHost = async (
 
   /** The last chronicle line announced. */
   let lastNews = ""
-  /** The guide step last shown, and the timer that hides its peek. */
-  let lastStep = ""
-  let peekTimer = 0
+  /**
+   * A phone's guide: the step stays above the tool bar until the mayor tucks it away (`tucked`: the step and
+   * state they tucked; a new step, or the same one under way, comes out again). Tucked away, the bulb pulses,
+   * and the first time a toast says where the guide went.
+   */
+  let stepNow = ""
+  let tucked = ""
+  let toldWhere = false
   /** Copies the town's numbers and preview into the page, once a frame. */
   const syncPage = () => {
     syncPanel()
@@ -1827,7 +1975,7 @@ export const createHost = async (
         ? `国库金币 · 点击查看上分钟收支\n上分钟：${signed(change)}（收入 ${cf.made}，支出 ${cf.used}${cf.traded !== 0 ? `，贸易 ${signed(cf.traded)}` : ""}）\n按当前速率：${signed(s.net)}/分钟（税收、贸易、维护、行政）`
         : `国库金币及当前每分钟收支 · 点击查看上分钟收支`
       coins.classList.toggle("debt", s.coins < 0)
-      const left = Math.max(0, s.charter.term * 60 - Math.floor(s.minute * 60))
+      const left = Math.max(0, s.charter.term * 60 - Math.floor((s.minute - s.fate.began) * 60))
       const severity = (w: typeof s.season.coming) => (w === null ? "" : ` (${winters[w].title})`)
       const until = s.season.winter
         ? `${winters[s.season.severity ?? "normal"].title} · 距离春季 ${clockText(s.season.left)}`
@@ -1880,7 +2028,7 @@ export const createHost = async (
         send.title = have < s.crown.amount ? `库存${goods[s.crown.good].title}不足` : `交付 ${s.crown.amount} ${goods[s.crown.good].title}，获得 ${s.crown.reward} 金币`
         send.disabled = have < s.crown.amount
       }
-      // What threatens the term, or is about to complete it.
+      // What threatens the term, or is about to raise the town a rank.
       const warnings: Array<string> = []
       if (s.fate.state === "playing") {
         if (s.fate.bankrupt !== null)
@@ -1892,7 +2040,7 @@ export const createHost = async (
         if (s.crown.streak > 0 && s.crown.streak >= s.crown.patience - 1) {
           warnings.push(`<b>王室耐心：</b>已连续 ${s.crown.streak} 次未交付；再有一次市长就会被撤换`)
         }
-        if (s.fate.complete !== null) warnings.push(`<b>所有目标已达成：</b>还有 ${clockText(s.fate.complete)} 即可完成建设`)
+        if (s.fate.rises !== null && s.fate.nextTitle !== null) warnings.push(`<b>所有目标已达成：</b>再保持 ${clockText(s.fate.rises)} 即可晋升为${s.fate.nextTitle}`)
       }
       const html = warnings
         .map((w) => `<div class="cell">${icon(w.startsWith("<b>所有目标") ? "goal" : "warning", 16)}<span>${w}</span></div>`)
@@ -1902,7 +2050,7 @@ export const createHost = async (
         alarm.innerHTML = html
       }
       alarm.classList.toggle("show", warnings.length > 0)
-      alarm.classList.toggle("good", warnings.length === 1 && s.fate.complete !== null)
+      alarm.classList.toggle("good", warnings.length === 1 && s.fate.rises !== null)
       // The ticker: what needs looking at now, then the news of the last minute and a half; click a line to go there.
       const minute = Math.round(s.minute * 3600)
       const news = s.chronicle.filter((l) => l.alarm && minute - l.tick < 90 * 60).slice(-3).reverse()
@@ -1919,10 +2067,22 @@ export const createHost = async (
       // The guide's step first: what to do next, and why.
       const g = s.guide.step
       const guideHtml = g
-        ? [
-            `<div class="head guide"><span>引导 · ${{ Founding: "建立城镇", "Keeping it standing": "维持运转", "Growing citizens": "吸引市民", Governing: "治理城镇" }[g.chapter]}</span><span class="progress" title="已完成的引导步骤">已完成 ${s.guide.done}/${s.guide.total} 步</span><button class="quiet" data-guide-off title="关闭引导（可从右下方的引导按钮重新开启）">隐藏引导</button></div>`,
-            `<div class="cell alert hint guide${g.at !== null ? " place" : ""}" data-guide>${icon("hint", 16, "mark")}<span class="text">${callouts(g.text)}<span class="goal">${icon("goal", 12)}<span>完成条件：${callouts(g.goal)}</span></span></span><span class="acts">${g.at !== null ? `<button class="act locate" title="定位">${icon("locate", 14)}</button>` : ""}<button class="act dismiss" data-skip="${escapeHtml(g.key)}" title="跳过此步骤">${icon("close", 12)}</button></span></div>`
-          ]
+        ? (() => {
+            const asks = new Set(g.asks)
+            const say = (text: string) => callouts(text, new Set(g.near ? [g.near] : []), asks)
+            const count = g.count ? `第 ${g.count.at}/${g.count.of} 步` : ""
+            return [
+              `<div class="head guide"><span>引导 · ${{ Founding: "建立城镇", "Keeping it standing": "维持运转", "Growing citizens": "吸引市民", Governing: "治理城镇" }[g.chapter]}</span><span class="progress" title="${g.count ? "新城镇的入门步骤" : ""}">${count}</span><button class="quiet" data-guide-off title="关闭引导（可通过引导按钮重新开启）">隐藏引导</button></div>`,
+              `<div class="cell alert hint guide${g.waiting ? " waiting" : g.locked ? " locked" : ""}${g.at !== null ? " place" : ""}" data-guide>${icon(g.waiting ? "clock" : g.locked ? "caution" : "hint", 16, "mark")}<span class="text">` +
+                `<span class="do">${say(g.text)}</span>` +
+                (g.waiting ? `<span class="why now">${say(g.waiting)}</span>` : g.locked ? `<span class="why now">${say(g.locked)}</span>` : `<span class="why">${say(g.why)}</span>`) +
+                `<span class="goal">${icon("goal", 12)}<span>完成条件：${say(g.goal)}</span></span>` +
+                (g.next ? `<span class="goal next">${icon("clock", 12)}<span>${say(g.next)}</span></span>` : "") +
+                `</span>` +
+                `<span class="acts">${g.at !== null ? `<button class="act locate" title="定位">${icon("locate", 14)}</button>` : ""}<button class="act dismiss" data-skip="${escapeHtml(g.key)}" title="跳过此步骤">${icon("close", 12)}</button></span>` +
+                `<button class="act tuck" data-tuck title="收起引导，之后可轻点右上角灯泡查看">${icon("close", 12)}</button></div>`
+            ]
+          })()
         : []
       const tickerHtml = [
         ...guideHtml,
@@ -1945,18 +2105,18 @@ export const createHost = async (
       ticker.classList.toggle("show", tickerHtml !== "" && s.fate.state === "playing")
       // The phone's guide button: the step it is on, or how many things need looking at.
       const bad = alerts.some((a) => a.tone === "bad")
-      const badge = g ? `${s.guide.done + 1}/${s.guide.total}` : alerts.length > 0 ? String(alerts.length) : ""
+      const things = alerts.length + (g ? 1 : 0)
+      const badge = g?.count ? `${g.count.at}/${g.count.of}` : things > 0 ? String(things) : ""
       if (guideBadge.textContent !== badge) guideBadge.textContent = badge
       guideBulb.classList.toggle("alert", bad)
-      // A new step peeks out above the tool bar for a few seconds.
-      const stepKey = g?.key ?? ""
-      // Not behind the town picker: the step waits until the town is founded.
-      if (stepKey !== lastStep && !ui.founding) {
-        lastStep = stepKey
-        window.clearTimeout(peekTimer)
-        ticker.classList.toggle("peek", stepKey !== "" && phone.matches && fold === null)
-        if (stepKey !== "") peekTimer = window.setTimeout(() => ticker.classList.remove("peek"), 7000)
-      }
+      // On a phone the step stays out above the tool bar, until tucked away; not behind the town picker or an open sheet.
+      const stepKey = g ? `${g.key}${g.waiting ? ":under way" : g.locked ? ":locked" : ""}` : ""
+      stepNow = stepKey
+      const peeking = stepKey !== "" && phone.matches && fold === null && tucked !== stepKey && !ui.founding && s.fate.state === "playing"
+      if (ticker.classList.contains("peek") !== peeking) ticker.classList.toggle("peek", peeking)
+      document.body.classList.toggle("peeking", peeking)
+      const nudge = stepKey !== "" && phone.matches && tucked === stepKey && fold !== "guide"
+      if (guideBulb.classList.contains("nudge") !== nudge) guideBulb.classList.toggle("nudge", nudge)
       // News as it happens: a toast for each new alarm line.
       const latest = s.chronicle.at(-1)
       const seen = `${s.charter.seed}|${latest?.tick ?? -1}|${s.chronicle.length}`
@@ -1985,7 +2145,7 @@ export const createHost = async (
     strokeBar.classList.toggle("open", held)
     document.body.classList.toggle("stroke-held", held)
     if (text && screenPointer) {
-      tooltip.textContent = text
+      setHtml(tooltip, iconize(escapeHtml(text)))
       tooltip.style.display = "block"
       tooltip.style.left = `${Math.min(screenPointer.x, window.innerWidth - tooltip.offsetWidth - 20)}px`
       tooltip.style.top = `${screenPointer.y}px`

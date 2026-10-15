@@ -14,7 +14,7 @@ page.on("console", e => { if (e.type() === "error") errors.push(e.text()) })
 page.on("response", r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`) })
 const output = "output/inkline-3d/town-review"
 await mkdir(output, { recursive: true })
-const groups = ["修订模型", "建筑", "公园", "住宅与街区", "冬季", "废墟", "人物与货物", "建筑状况"]
+const groups = ["全部建筑", "细节修订", "贸易与生产建筑", "工坊组", "修订模型", "建筑", "公园", "住宅与街区", "冬季", "废墟", "人物与货物", "建筑状况", "建筑升级与采空矿面"]
 const captureSheet = async () => {
   const previous = await page.locator("#sheet-link").getAttribute("href")
   await page.getByRole("button", { name: "保存模型总览图", exact: true }).click()
@@ -42,6 +42,10 @@ try {
     await page.screenshot({ path: `${output}/${collection}-page.png` })
     await page.getByRole("button", { name: "查看背面", exact: true }).click()
     assert.equal(await page.locator("output").textContent(), "180°")
+    if (["town", "rural", "workshops", "trades"].includes(collection)) {
+      const rear = await captureSheet()
+      await writeFile(`${output}/${collection}-rear.png`, Buffer.from(rear.split(",")[1]!, "base64"))
+    }
     await page.getByRole("button", { name: "重置视角", exact: true }).click()
     await page.getByLabel("视角仰角").selectOption("50")
     const rear = await captureSheet()
@@ -50,6 +54,20 @@ try {
     console.log(`ok ${collection}: ${await page.locator(".model-view").count()} models, rotation, elevation, PNG export`)
   }
   await page.setViewportSize({ width: 390, height: 844 })
+  for (const [group, count, name] of [["全部建筑", 25, "town"], ["细节修订", 9, "rural"]] as const) {
+    await page.getByRole("button", { name: group, exact: true }).click()
+    assert.equal(await page.locator(".model-view").count(), count)
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${group}: phone preview must fit`)
+    await page.screenshot({ path: `${output}/${name}-phone.png` })
+  }
+  await page.getByRole("button", { name: "贸易与生产建筑", exact: true }).click()
+  assert.equal(await page.locator(".model-view").count(), 6)
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, "Trade building phone preview must fit the viewport")
+  await page.screenshot({ path: `${output}/trades-phone.png` })
+  await page.getByRole("button", { name: "工坊组", exact: true }).click()
+  assert.equal(await page.locator(".model-view").count(), 4)
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, "Workshop phone preview must fit the viewport")
+  await page.screenshot({ path: `${output}/workshops-phone.png` })
   await page.getByRole("button", { name: "公园", exact: true }).click()
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, "Phone preview must fit the viewport")
   await page.screenshot({ path: `${output}/phone.png` })

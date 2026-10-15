@@ -1,5 +1,5 @@
 import { buildStages, homeVariant } from "../art.ts"
-import { makeBuilding, type BuildingOptions } from "../asset-lab/buildings.ts"
+import { makeBuilding, buildingDimensions, type BuildingOptions } from "../asset-lab/buildings.ts"
 import { house } from "../asset-lab/homes.ts"
 import { Drawing, palette, square, type InkAsset, type Vertex, type Side } from "../asset-lab/primitives.ts"
 import { hash } from "../asset-lab/land.ts"
@@ -9,6 +9,9 @@ import { key, cellOf, DIRS } from "../grid.ts"
 import type { Preview } from "../ui.ts"
 import { withAppearance, type Appearance } from "../asset-lab/appearance.ts"
 import { setts } from "../asset-lab/town-props.ts"
+import { isWorkshop, workshopConstruction } from "../asset-lab/workshops.ts"
+import { isTradeYard, tradeConstruction } from "../asset-lab/trades.ts"
+import { serviceBuilding, upgradeHeights, type ServiceKind } from "../asset-lab/service-upgrades.ts"
 
 export type DoorSet = Record<Side, boolean>
 export const noDoors: DoorSet = { right: false, left: false, backRight: false, backLeft: false }
@@ -62,12 +65,23 @@ export function constructionAsset(size: number, half: number, height: number, bu
   if (stage.walls > 0) d.box(0, 0, a, a, 0, Math.max(2, Math.round(height * stage.walls)))
   return d.asset
 }
-export function buildingAsset(id: KindId, build: number, share: number | null, doors: DoorSet, open: number, appearance: Appearance = {}) {
+/** The height a building of a kind is drawn to its eaves, upgraded or not (see `upgradeHeights`). */
+export const buildingHeight = (id: KindId, upgraded = false) =>
+  upgraded && isUpgradable(id) ? upgradeHeights[id].eave : buildingDimensions(id).height
+const isUpgradable = (id: KindId): id is ServiceKind => id === "market" || id === "chapel"
+
+export function buildingAsset(id: KindId, build: number, share: number | null, doors: DoorSet, open: number, appearance: Appearance = {}, upgraded = false) {
   const kind = kinds[id],
     stage = buildStages(build)
-  if (build < 0.78) return constructionAsset(kind.size, kind.half, kind.roof === "gable" ? 20 : kind.stories * 32, build, share)
+  if (build < 0.78) return isWorkshop(id)
+    ? workshopConstruction(id, build, share, doors)
+    : isTradeYard(id) ? tradeConstruction(id, build, share, doors)
+    : constructionAsset(kind.size, kind.half, kind.roof === "gable" ? 20 : kind.stories * 32, build, share)
+  // An upgraded building is only ever a standing one: the upgrade is paid and done at once.
+  if (upgraded && isUpgradable(id)) return withAppearance(serviceBuilding(id, 2, { plate: false, doors }), kind.half * U, buildingHeight(id, true), appearance)
   const asset = makeBuilding(id, { doors, open, fit: stage.fit, plate: false, motion: false } satisfies BuildingOptions)
-  return build >= 1 ? withAppearance(asset, kind.half * U, kind.roof === "gable" ? 20 : kind.stories * 32, appearance) : asset
+  const dimensions = buildingDimensions(id)
+  return build >= 1 ? withAppearance(asset, dimensions.half, dimensions.height, appearance) : asset
 }
 export function homeAsset(tier: Tier, n: number, build: number, share: number | null, doors: DoorSet, appearance: Appearance = {}) {
   if (build < 0.78) return constructionAsset(1, home.half + (tier >= 2 ? 1 : 0), home.tiers[tier].height, build, share)

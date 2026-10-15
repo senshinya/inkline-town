@@ -16,7 +16,6 @@ const INK = "#3d4943",
 
 /** What became of a town whose term ran out. */
 export const verdictOf = (s: Stats): string => {
-  if (s.fate.governing) return "建设完成"
   const residents = s.settlers + s.citizens
   if (s.fate.peak < 40) return "城镇未能扎根"
   if (residents >= sizes[s.charter.size].goal.residents * 0.75) return "欣欣向荣"
@@ -36,13 +35,11 @@ const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n)}
 
 export const cardFacts = (s: Stats): CardFacts => {
   const headline =
-    s.fate.state === "won"
-      ? "城镇建设完成"
-      : s.fate.state === "lost"
-        ? capital(s.fate.reason.split(/[:：]/)[0]!.toLowerCase())
-        : s.fate.state === "over"
-          ? `任期结束：${verdictOf(s)}`
-          : `第 ${s.season.year} 年 · 已执政 ${Math.floor(s.minute)} 分钟`
+    s.fate.state === "lost"
+      ? capital(s.fate.reason.split(/[:：]/)[0]!.toLowerCase())
+      : s.fate.state === "over"
+        ? `${s.fate.rankTitle}：第 ${s.fate.term} 届任期结束，${verdictOf(s)}`
+        : `${s.fate.rankTitle} · 第 ${s.season.year} 年 · 第 ${s.fate.term} 届任期`
   return {
     headline,
     land: `${sizes[s.charter.size].title} · ${lands[s.charter.land].title}资源 · 任期 ${s.charter.term} 分钟`,

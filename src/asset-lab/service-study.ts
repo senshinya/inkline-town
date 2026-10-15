@@ -21,7 +21,7 @@ root.innerHTML = `
     ${card("chapel", "01", "教堂", "蓝色玻璃、浅色墙面与原有的小穹顶。")}
     ${card("church", "02", "大教堂", "坡顶中殿、石砌扶壁与悬挂铜钟的开放式钟楼。")}
   </div></section>
-  <footer><p>拖动任意模型可同步旋转四个视图，在模型上滚动可缩放。</p><div><a href="/asset-lab.html?asset=market-hall">完整模型目录 ↗</a><a href="/map-lab.html">在城镇中查看 ↗</a></div><p class="note">此页仅预览模型，游戏内升级规则尚未接入。</p></footer>
+  <footer><p>拖动任意模型可同步旋转四个视图，在模型上滚动可缩放。</p><div><a href="/asset-lab.html?asset=market-hall">完整模型目录 ↗</a><a href="/map-lab.html">在城镇中查看 ↗</a></div><p class="note">此页对比一级与二级服务建筑。达到城镇等级后，可在建筑详情中升级。</p></footer>
 `
 
 function card(id: string, tier: string, title: string, note: string) {

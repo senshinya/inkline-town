@@ -53,7 +53,12 @@ for the guide and the map overlays. `host.ts` sets `body.fold-goods`,
 `fold-guide`, `fold-views` or `fold-more` while one is open; a tap on the map
 folds it, a pan or pinch does not. Once the town has a minute of goods
 (`body.flow-ready`), the goods chip opens the made/used table straight away,
-each good by its icon. A new guide step peeks above the tool bar for a few seconds. Sheets
+each good by its icon. The guide's step stays above the tool bar until tucked away
+(its ✕); tucked, the bulb pulses, and a new step (or the same one under way)
+comes out again. Guide texts in `src/rules/guide.ts` name tools,
+panels and map views as `[homes]`, `[town]` or `[view:fire]` and verbs as
+`{tap|click}`, never keys, so they read right on either screen;
+`test/guide.test.ts` checks it. Sheets
 open from the side on a landscape phone (`max-height: 500px`) and from the
 bottom in portrait. Dialogs take the whole screen with their actions pinned
 to the bottom. The camera bar is hidden: pinch zooms and turns. New UI needs
@@ -69,7 +74,7 @@ the cache of unused animation/construction states. Loading or founding a
 town clears and rebuilds the presentation from the saved world.
 
 `pnpm check:browser` uses an isolated Chromium browser and the running dev
-server. It can use installed Brave/Chrome or `BROWSER_EXECUTABLE_PATH`; otherwise
+server (start `pnpm dev` first; without one it times out loading the page). It can use installed Brave/Chrome or `BROWSER_EXECUTABLE_PATH`; otherwise
 install Chromium with `pnpm exec playwright install chromium`. `GAME_BASE_URL`
 overrides the local URL. It generates a reproducible 20-minute bot save,
 loads it through the real UI, and writes screenshots and measurements to
@@ -100,12 +105,12 @@ and elevation controls also work with a keyboard. The original view uses a
 | --- | ---: | --- |
 | Buildings | 39 | Every building kind, tier 2 market hall and church, plus winter and worn material presets of the seven town services and stores |
 | Homes | 21 | Four settler and citizen roof palettes, townhouse, and fine/poor/worn/winter material presets of every tier |
-| Land | 30 | Trees, single-cell rocks and larger outcrops, crops, roads, water, raised stone paving, three retained park furnishings and the park layout |
+| Land | 32 | Trees, single-cell rocks (full, quarried, and worked down to a face) and larger outcrops, crops, roads, water, raised stone paving, three retained park furnishings and the park layout |
 | People | 32 | Carriers, residents, market and chapel walkers, and five equipped service workers |
 | Cargo and vehicles | 75 | Twelve distinct goods and labelled crates; empty handcart/barrow and small/full loads of each good; the approved mixed goods plate |
 | Construction and effects | 14 | Sites, frame/walls, problem sign, smoke, placement outlines and three kinds of ruin |
 
-The 211 entries cover object families and representative seeded variants.
+The 213 entries cover object families and representative seeded variants.
 Continuous growth, construction progress, walk poses and colours can be
 generated; this is not a list of every possible random seed. Page icons
 remain the game's original 2D UI art.
@@ -115,10 +120,11 @@ remain the game's original 2D UI art.
 [`/service-upgrades.html`](http://localhost:5232/service-upgrades.html) compares
 the market with the market hall and the chapel with the church. The four
 models share one scale and synchronized rotation, tilt and zoom. Each model
-has a GLB download. [The integration handoff](docs/service-upgrade-assets.md)
-describes the asset API and the gameplay work still needed.
+has a GLB download. [The asset notes](docs/service-upgrade-assets.md)
+describe the asset API and how the town draws them: an upgraded building is
+drawn with its tier 2 model, turned a quarter at a time to face its road.
 
-`pnpm assets:build` exports 211 GLBs and editable geometry descriptions,
+`pnpm assets:build` exports 213 GLBs and editable geometry descriptions,
 a manifest, and six standalone viewers to `output/inkline-3d/`:
 `inkline-3d-study.html`, `inkline-3d-map.html`, and
 `inkline-town-model-review.html`, `inkline-house-effects.html`, `inkline-park.html`, and `inkline-service-upgrades.html`. It reimports every GLB and
@@ -206,10 +212,30 @@ That is how the README's screenshots of grown towns were made.
 
 ### Reviewing the new town models
 
+[`/model-review.html?collection=town`](http://localhost:5232/model-review.html?collection=town)
+shows all 23 building kinds plus the market hall and church upgrades. The final
+nine refinements are grouped at `?collection=rural`. `src/asset-lab/rural.ts`
+owns timber entrances, nursery and farm fittings, chapel porches, granary louvres
+and the supported fire-watch access route. The same geometry is used in the game,
+catalogue, model sheets and GLB exports.
+
+[`/model-review.html?collection=trades`](http://localhost:5232/model-review.html?collection=trades)
+groups the mill, warehouse, fishery, bakery, weaver and watch house revisions.
+`src/asset-lab/trades.ts` owns their equipment, loading doors, open yards and the
+bakery smoke origin. The mill keeps its animated sails. Cargo sits on the ground
+or loading apron, and the four new yard layouts turn towards connected roads.
+
+[`/model-review.html?collection=workshops`](http://localhost:5232/model-review.html?collection=workshops)
+groups the revised mine, smithy, sawmill and town hall. The three workshops have
+open yards and road-facing layouts. `src/asset-lab/workshops.ts` owns their
+geometry, construction frames and smoke origins. The live renderer and catalogue
+use the same models; simulation footprints and building costs are unchanged.
+
 Open [`/model-review.html`](http://localhost:5232/model-review.html) for
 the models added for PR #3. Collections cover buildings, parks,
-home tiers and neighbourhoods, winter, hazards, people/cargo and building
-condition. Drag any model or use the rotation slider to turn the collection.
+home tiers and neighbourhoods, winter, hazards, people/cargo, building
+condition, and upgrades & worked faces (the market and chapel beside their
+upgrades, and stone and ore full, quarried, and worked down to a face). Drag any model or use the rotation slider to turn the collection.
 **Inspect** opens the full asset viewer. **Download GLB** exports one model;
 **Save model sheet** captures a labelled sheet of the selected collection.
 `pnpm check:models` checks every collection, camera controls, sheet exports
@@ -287,6 +313,12 @@ pnpm balance -- --seeds 1 --verbose --every 1   # minute by minute
 pnpm balance -- --snapshot 40                   # save each seed's town at minute 40 (see above)
 ```
 
+Each seed reports the ranks it rose to and when, and the summary how many
+seeds reached each rank and around which minute. On a medium fair 90-minute
+term the sensible bot reaches the village around minute 24 (the citizens'
+share holds it back) and the town around minute 36; it builds no parks and
+makes no upgrades, so it does not reach the city.
+
 The economy is tuned so that spreading cottages stops paying: food goes by the
 resident, administration per home climbs (each more home costs about 6 coins a
 minute at 80 homes), taxes above 100% empty homes directly, and bought goods
@@ -342,23 +374,35 @@ quarry. The bots know the thresholds; the player only has the panel.
 `pnpm test` runs model-based tests built on Effect's `Schema` and
 `Arbitrary`. They generate sequences of what a mayor can do (roads, homes,
 buildings where they fit, bulldozing, taxes, trade, pausing, answering the
-crown, saving and loading, waiting through seasons, and fortune good and
-bad), play them on the real simulation, and after every command check what
+crown, upgrading a building, standing for the next term, saving and
+loading, waiting through seasons, and fortune good and bad), play them on
+the real simulation, and after every command check what
 must always be true: goods within their shelves, tiles on the land and
 apart, residents and workers within bounds, the census matching the homes,
 walkers belonging to standing buildings, approval and prices within their
-bounds, the clock and the record only going forward, and a term ending only
-in the allowed ways. A failure shrinks to the shortest sequence that still
+bounds, the clock and the record only going forward, rocks never below
+their worked faces, a rank never lost, and a term ending only in the
+allowed ways (and following only as the next term, when chosen). A failure shrinks to the shortest sequence that still
 breaks a rule. A second property checks that the same charter and commands
 always make the same town. `RUNS=200 pnpm test` searches harder;
 `SEED=…` replays.
+
+`test/endless.test.ts` checks the town that goes on, each in seconds of game
+time: each rank asks more than the last, a rock quarried down stays as a
+worked face and gives one more now and then (and the bulldozer clears only a
+worked face), a market becomes a market hall only once the town is a town
+(and pulling one down gives back part of both costs), the next term carries
+on the same town with its own winters, and a long reign of five terms ends
+each on time, starts the crown's tally afresh each term, thins its older
+history, keeps its chronicle capped, and keeps its save in bounds.
 
 `test/share.test.ts` checks the server's routes and what they refuse, and
 carries a real town through them into another headless town, which must
 then play on step for step the same as the original.
 
 `pnpm check` puts the real simulation into each way a term can end
-(complete, bankrupt, revolt, abandoned, dismissed, run out), checks an unanswered
+(bankrupt, revolt, abandoned, dismissed, run out), raises a town through its
+ranks and into its next term, checks an unanswered
 crown request, and checks that a town saved mid-term loads back the same. It
 also checks the neighbourhood: a citizens' home next to a smithy goes back to
 settlers; an unwatched row of cottages catches fire and the fire spreads, and

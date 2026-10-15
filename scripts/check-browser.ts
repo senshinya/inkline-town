@@ -60,7 +60,7 @@ try {
   await dragGrid([tile.x+3.5,tile.y+1.5],[tile.x+8.5,tile.y+1.5])
   await page.waitForFunction(([x,y])=>[3,4,5,6,7,8].every(dx=>window.town.runtime.snapshot().entities.some(e=>e.components["Town/Road"]&&e.components["Town/Tile"].x===x!+dx&&e.components["Town/Tile"].y===y!+1)),[tile.x,tile.y])
   assert.match(await page.locator(".ticker .head.guide").textContent() ?? "",/引导/)
-  assert.match(await page.locator(".ticker .guide .goal").textContent() ?? "",/完成条件/)
+  assert.match(await page.locator(".ticker .guide .goal:not(.next)").textContent() ?? "",/完成条件/)
   facts.localizedGuide=true
   facts.rotatedRoadDrag=true
   await tool("住宅")
@@ -79,8 +79,8 @@ try {
   await page.waitForFunction(()=>window.town.ui.stats!.settlers>0)
   assert.ok((await entities("Town/House")).some(e=>!("Town/Site" in e.components)))
   facts.liveConstruction=true
-  await page.locator(".ticker .ref.kind[data-kind=fishery]").first().waitFor({state:"visible"})
-  facts.localizedBuildingCallouts=true
+  await page.locator(".ticker .ref.tool[data-tool=road]").first().waitFor({state:"visible"})
+  facts.localizedTutorialTools=true
   await tool("选择")
   await page.keyboard.press("e")
   const lt=lumber.components["Town/Tile"]
@@ -205,7 +205,8 @@ try {
   await page.evaluate(save=>localStorage.setItem("inkline-town/save/manual",JSON.stringify({...save,savedAt:Date.now()})),ended)
   await page.getByRole("button",{name:"读取",exact:true}).click()
   await page.getByRole("button",{name:"不保存，直接读取",exact:true}).click()
-  await page.getByRole("button",{name:"建立新城镇",exact:true}).waitFor({state:"visible"})
+  await page.getByRole("button",{name:"下一任期",exact:true}).waitFor({state:"visible"})
+  await page.getByRole("button",{name:"卸任并新建城镇",exact:true}).waitFor({state:"visible"})
   assert.equal(await page.evaluate(()=>window.town.ui.stats!.fate.state),"over")
   facts.reckoning=true
   // Sharing: the card, then a link that opens the town in another browser (a phone), which can play on from there.
