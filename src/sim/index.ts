@@ -2,24 +2,21 @@
  * The simulation, one fixed step at a time. Nothing here touches the
  * renderer, so it runs headless too.
  */
-import { amounts, defaultCharter, goodIds, TRADE_LOAD } from "../content.ts"
+import { Clock } from "@typeonce/ritmo"
+import * as Random from "@typeonce/ritmo-math/Random"
+import { amounts, defaultCharter, goodIds, step, TRADE_LOAD } from "../content.ts"
 import { Game, Time } from "../schema.ts"
 import { ApplyEdits } from "./edits.ts"
 import { Deliver, Dispatch } from "./logistics.ts"
 import { Decay } from "./decay.ts"
 import { Appraise, Douse, Hazards } from "./hazards.ts"
+import { DropOrphans } from "./orphans.ts"
 import { Approve, foundedFate, Judge, Record, Requests, Seasons } from "./term.ts"
 import { Collect, Households, TakeCensus } from "./town.ts"
 import { SendWalkers, Walk, Wander } from "./walkers.ts"
 import { AssignStaff, CountStock, Grow, IndexGrid, Plant, Raise, Spread, Work } from "./work.ts"
 
-export const AdvanceTime = Game.System(
-  "Town/AdvanceTime",
-  { resources: { time: Game.System.writeResource(Time) } },
-  ({ resources }) => {
-    resources.time.update((t) => ({ tick: t.tick + 1 }))
-  }
-)
+export const AdvanceTime = Clock.system(Game, { name: "Town/AdvanceTime", resource: Time })
 
 export const simulate = Game.Schedule(
   AdvanceTime,
@@ -46,6 +43,8 @@ export const simulate = Game.Schedule(
   Households,
   Hazards,
   Game.Schedule.applyDeferred(),
+  // Walkers and fields whose building went before they joined it go now.
+  DropOrphans,
   Decay,
   Game.Schedule.applyDeferred(),
   Collect,
@@ -59,11 +58,11 @@ export const simulate = Game.Schedule(
 
 /** The world's resources before any town is founded (a `newTown` edit fills them in). */
 export const blankResources = () => ({
-  Time: { tick: 0 },
-  Rng: 0x5eed,
+  Time: Clock.start(step),
+  Rng: Random.seed(0x5eed),
   Treasury: { coins: 0 },
   Ledger: { taxes: 0, trade: 0, upkeep: 0, admin: 0 },
-  Census: { homes: 0, settlers: 0, citizens: 0, burghers: 0, jobs: 0, employed: 0, food: 0, bread: 0, cloth: 0, faith: 0, sick: 0, burning: 0 },
+  Census: { homes: 0, settlers: 0, citizens: 0, burghers: 0, jobs: 0, employed: 0, food: 0, bread: 0, cloth: 0, faith: 0, furniture: 0, sick: 0, burning: 0 },
   Policy: { settlers: 100, citizens: 100, sells: [], buys: [], reserve: 25, loads: amounts(Object.fromEntries(goodIds.map((g) => [g, TRADE_LOAD]))) },
   Charter: { ...defaultCharter(0), founded: 0, winters: [] as Array<"none" | "mild" | "normal" | "hard"> },
   Land: { mask: "", cells: 0 },
@@ -79,6 +78,7 @@ export const blankResources = () => ({
   Fires: { fires: [], next: 1 },
   Grid: { owner: [], use: [] },
   Stock: amounts({}),
+  Handed: { log: [] },
   Flow: { town: "", since: 0, start: null, made: amounts({}), traded: amounts({}), held: amounts({}), coins: { start: 0, made: 0, traded: 0, seen: 0, booked: 0 }, slices: [], last: null }
 })
 

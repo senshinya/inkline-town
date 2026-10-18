@@ -25,7 +25,7 @@
  * - citizens will not take settlers' work, and settlers stand in for citizens as apprentices;
  * - and homes with every need met become citizens on a street with a park behind it, not packed beside industry.
  */
-import { amounts, CONDITION_MAX, goodIds, kinds, RISK_MAX, ticks, type CharterValue, type GroundId, type KindId, type PropId } from "../src/content.ts"
+import { amounts, CONDITION_MAX, goodIds, kinds, RISK_MAX, stepsOf, type CharterValue, type GroundId, type KindId, type PropId } from "../src/content.ts"
 import { canPlace, DIRS, entrances, GridBuilder, isRoad, key, type Use } from "../src/grid.ts"
 import { inside } from "../src/iso.ts"
 import { parkValue, ringOf, type ParkCell } from "../src/appeal.ts"
@@ -101,7 +101,7 @@ const settle = (s: Snapshot, homes: number) => {
       id: s.nextEntity++,
       components: {
         "Town/Tile": { x, y, size: 1 },
-        "Town/House": { tier: 2, residents: 8, food: forever, bread: forever, cloth: forever, faith: forever, clock: 1 }
+        "Town/House": { tier: 2, residents: 8, food: forever, bread: forever, cloth: forever, faith: forever, furniture: forever, clock: 1 }
       }
     })
     placed += 1
@@ -125,6 +125,9 @@ const check = (name: string, ok: boolean, detail: string) => {
   t.change((s) => {
     placed = settle(s, 25)
     s.resources["Town/Treasury"].coins = 10_000
+    // Furniture in store, so the finest of them can rise to townhouses.
+    const hall = s.entities.find((e) => e.components["Town/TownHall"])!.components["Town/Inventory"]
+    hall.stock.furniture = 30
   })
   t.run(8 * 60)
   const f = t.fate()
@@ -250,7 +253,7 @@ const homeAt = (s: Snapshot, x: number, y: number, tier: 1 | 2 | 3, residents: n
     id,
     components: {
       "Town/Tile": { x, y, size: 1 },
-      "Town/House": { tier, residents, food: needs ? forever : 0, bread: needs ? forever : 0, cloth: needs ? forever : 0, faith: needs ? forever : 0, clock: 1 },
+      "Town/House": { tier, residents, food: needs ? forever : 0, bread: needs ? forever : 0, cloth: needs ? forever : 0, faith: needs ? forever : 0, furniture: needs ? forever : 0, clock: 1 },
       "Town/Risk": { fire: r.fire ?? 0, health: r.health ?? 0, order: r.order ?? 0, thefts: 0 },
       "Town/Condition": { value: CONDITION_MAX }
     }
@@ -269,7 +272,7 @@ const standing = (s: Snapshot, kind: KindId, x: number, y: number, stock: Partia
   }
   if (k.recipe) {
     const r = k.recipe
-    c["Town/Recipe"] = { input: r.input, inputs: r.inputs, output: r.output, batch: r.batch, period: ticks(r.seconds), progress: 0, made: 0 }
+    c["Town/Recipe"] = { input: r.input, inputs: r.inputs, output: r.output, batch: r.batch, period: stepsOf(r.seconds), progress: 0, made: 0 }
   }
   if (k.gathers) c["Town/Gatherer"] = { ...k.gathers }
   const tools = k.wear ? ["tools"] : []
@@ -279,7 +282,7 @@ const standing = (s: Snapshot, kind: KindId, x: number, y: number, stock: Partia
     if (all || k.keeps) c["Town/Storage"] = {}
   } else if (k.recipe) c["Town/Inventory"] = { stock: amounts(stock), accepts: [k.recipe.output, ...tools], cap: 8 }
   if (k.carriers) c["Town/Carriers"] = { count: k.carriers }
-  if (k.service) c["Town/Service"] = { service: k.service.service, interval: ticks(k.service.seconds), cooldown: 0, range: k.service.range }
+  if (k.service) c["Town/Service"] = { service: k.service.service, interval: stepsOf(k.service.seconds), cooldown: 0, range: k.service.range }
   c["Town/Risk"] = { fire: 0, health: 0, order: 0, thefts: 0 }
   c["Town/Condition"] = { value: CONDITION_MAX }
   const id = s.nextEntity++

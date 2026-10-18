@@ -1,3 +1,4 @@
+import { every } from "../content.ts"
 import { near, riskIncrements } from "../rules/risks.ts"
 /**
  * The neighbourhood and its dangers. Every so often the town's desirability
@@ -9,15 +10,15 @@ import { near, riskIncrements } from "../rules/risks.ts"
  * home left derelict. A fire watch sends firefighters running to any blaze
  * (`Douse`): when they arrive, that house is lost but the fire is out.
  */
-import * as Random from "@typeonce/bevy-ts-math/Random"
+import * as Random from "@typeonce/ritmo-math/Random"
 
 import { appealGrid, appealAt, buildingSource, homeSource, landSource, parkSources, type AppealSource } from "../appeal.ts"
 import { ruinDraft } from "../archetypes.ts"
-import { goodIds, risk, type GoodId } from "../content.ts"
+import { goodIds, risk, upgradeAt, type GoodId } from "../content.ts"
 import { doors, nearest, pathTo, reach, useAt } from "../grid.ts"
 import { counted, placeName, type Landmark } from "../places.ts"
 import type { Point } from "../iso.ts"
-import { Appeal, Building, Burning, Charter, Chronicle, Condition, Figure, Fires, Game, Rules, Grid, House, Inventory, Mood, Park, Paused, Paved, Rescue, Rising, Risk, Rng, Road, Route, Ruin, Service, Sick, Site, Staff, Storage, Tile, Time, Tree, Treasury, Upgraded, WalkerOf, Water, maybe } from "../schema.ts"
+import { Appeal, Building, Burning, Charter, Chronicle, Condition, Figure, Fires, Game, Rules, Grid, House, Inventory, Mood, Park, Paused, Paved, Rescue, Rising, Risk, Rng, Road, Route, Ruin, Service, Sick, Site, Staff, Storage, Tile, Time, Tree, Treasury, Upgraded, WalkerOf, Water } from "../schema.ts"
 import { elapsed, seasonAt, write } from "./shared.ts"
 
 // ── Desirability ──────────────────────────────────────────────────────────
@@ -43,10 +44,10 @@ export const Appraise = Game.System(
     const rules = services.rules
     const { appeal, condition: wear } = rules
 
-    if (resources.time.get().tick % appeal.every !== 0 && resources.appeal.get().cells.length > 0) return
+    if (!every(resources.time.get(), appeal.every) && resources.appeal.get().cells.length > 0) return
     const sources: Array<AppealSource> = []
     for (const { data } of queries.buildings.each()) {
-      const s = buildingSource(data.building.get().kind, data.tile.get(), rules, data.upgraded.present)
+      const s = buildingSource(data.building.get().kind, data.tile.get(), rules, data.upgraded.value()?.level ?? 0)
       if (s) sources.push(s)
     }
     for (const { data } of queries.trees.each()) sources.push(landSource("forest", data.tile.get(), rules))
@@ -92,7 +93,7 @@ export const Hazards = Game.System(
       blazes: Game.Query({ selection: { burning: Game.Query.write(Burning) } }),
       landmarks: Game.Query({ selection: { tile: Game.Query.read(Tile), building: Game.Query.read(Building) }, without: [Site, Rising] }),
       watches: Game.Query({
-        selection: { tile: Game.Query.read(Tile), service: Game.Query.read(Service), staff: Game.Query.read(Staff) },
+        selection: { tile: Game.Query.read(Tile), service: Game.Query.read(Service), staff: Game.Query.read(Staff), upgraded: Game.Query.optional(Upgraded) },
         without: [Site, Rising, Burning]
       }),
       crews: Game.Query({ selection: { rescue: Game.Query.read(Rescue), home: Game.Query.readRelation(WalkerOf) } }),
@@ -109,13 +110,20 @@ export const Hazards = Game.System(
       fires: Game.System.writeResource(Fires),
       chronicle: Game.System.writeResource(Chronicle)
     },
-    services: { rules: Game.System.service(Rules) }
+    services: { rules: Game.System.service(Rules) },
+    commands: Game.System.commands(
+      Game.System.spawns(Ruin, Rescue),
+      Game.System.inserts(Burning, Sick),
+      Game.System.removes(Sick),
+      Game.System.despawns(Tile),
+      Game.System.relates(WalkerOf)
+    )
   },
   ({ queries, resources, commands, services }) => {
     const rules = services.rules
     const { kinds, goods, risk, winters, riskMax: RISK_MAX, riskTicks: RISK_TICKS } = rules
 
-    const tick = resources.time.get().tick
+    const tick = resources.time.get().step
     if (tick % RISK_TICKS !== 0) return
     const charter = resources.charter.get()
     const t = elapsed(resources.time.get(), charter)
@@ -124,7 +132,7 @@ export const Hazards = Game.System(
     const approval = resources.mood.get().approval
     const season = seasonAt(t, charter, rules)
     const heating = season.severity !== null && winters[season.severity].heating
-    const random = Random.make(resources.rng.get())
+    const random = Random.draw(resources.rng)
     const news = (text: string, at: Point | null = null) => write(resources.chronicle, t, text, true, at)
     const landmarks: Array<Landmark> = queries.landmarks.each().map(({ data }) => ({ kind: data.building.get().kind, ...data.tile.get() }))
     const where = (cell: Point) => placeName(landmarks, cell)
@@ -132,7 +140,7 @@ export const Hazards = Game.System(
 
     const rows = queries.cared.each()
     const hot = rows.filter(({ data }) => {
-      const b = maybe(data.building)
+      const b = data.building.value()
       return b !== undefined && kinds[b.kind].hot === true && !data.burning.present
     }).map(({ data }) => data.tile.get())
     const dusty = landmarks.filter((l) => kinds[l.kind].dusty)
@@ -144,7 +152,7 @@ export const Hazards = Game.System(
 
     /** Turns a home or building into a ruin. */
     const ruin = (row: (typeof rows)[number], cause: "burnt" | "collapsed" | "derelict") => {
-      commands.despawn(row.entity.id)
+      commands.despawn(row.entity)
       commands.spawn(ruinDraft(row.data.tile.get(), cause))
     }
     const lost = new Set<number>()
@@ -155,10 +163,10 @@ export const Hazards = Game.System(
       const { data } = row
       if (data.burning.present) continue
       const tile = data.tile.get()
-      const h = maybe(data.house)
+      const h = data.house.value()
       // A closed home has nobody in it to fall sick, steal, or knock over a lamp.
       if (h && data.paused.present) continue
-      const b = maybe(data.building)
+      const b = data.building.value()
       const r = { ...data.risk.get() }
       const increments = riskIncrements({
         tile, condition: data.condition.get().value, desirability: appealAt(cells, tile.x, tile.y), approval, heating,
@@ -177,13 +185,13 @@ export const Hazards = Game.System(
         const id = fires.next
         fires.next += 1
         fires.fires.push({ id, x: tile.x, y: tile.y, homes: 0, buildings: 0 })
-        commands.insert(row.entity.id, Game.Command.entry(Burning, { left: risk.fire.burns, fire: id }))
+        commands.insert(row.entity, Game.Command.entry(Burning, { left: risk.fire.burns, fire: id }))
         ignited.set(row.entity.id, id)
         r.fire = 0
         news(`${where(tile)}发生火灾！`, tile)
       }
       if (h && r.health >= RISK_MAX && !data.sick.present) {
-        commands.insert(row.entity.id, Game.Command.entry(Sick, { left: risk.health.lasts }))
+        commands.insert(row.entity, Game.Command.entry(Sick, { left: risk.health.lasts }))
         r.health = 0
         if (sickNow === 0) news(`${where(tile)}出现疾病：医师可以治疗。`, tile)
       }
@@ -227,7 +235,7 @@ export const Hazards = Game.System(
       const s = data.sick.get()
       const left = s.left - RISK_TICKS
       if (left <= 0) {
-        commands.remove(entity.id, Sick)
+        commands.remove(entity, Sick)
         continue
       }
       data.sick.set({ left })
@@ -265,7 +273,7 @@ export const Hazards = Game.System(
       if (!neighbour) continue
       const chance = risk.fire.catches + (risk.fire.spread * neighbour.data.risk.get().fire) / RISK_MAX
       if (random.next() < chance) {
-        commands.insert(neighbour.entity.id, Game.Command.entry(Burning, { left: risk.fire.burns, fire: b.fire }))
+        commands.insert(neighbour.entity, Game.Command.entry(Burning, { left: risk.fire.burns, fire: b.fire }))
         ignited.set(neighbour.entity.id, b.fire)
       }
     }
@@ -275,7 +283,7 @@ export const Hazards = Game.System(
     const crewed = new Set<number>()
     for (const { data } of queries.crews.each()) {
       out.set(data.home.get(), (out.get(data.home.get()) ?? 0) + 1)
-      if (!data.rescue.get().back) crewed.add(data.rescue.get().target as unknown as number)
+      if (!data.rescue.get().back) crewed.add(data.rescue.get().target)
     }
     const watches = queries.watches.each().filter(({ data }) => data.service.get().service === "fire" && data.staff.get().assigned > 0)
     const burningNow = [...queries.blazes.each().map(({ entity }) => entity.id as number), ...ignited.keys()].filter((id) => !lost.has(id))
@@ -286,7 +294,9 @@ export const Hazards = Game.System(
       const goal = doors(grid, target.data.tile.get())
       let best: { readonly watch: (typeof watches)[number]; readonly roads: ReturnType<typeof reach>; readonly cell: Point; readonly distance: number } | null = null
       for (const watch of watches) {
-        if ((out.get(watch.entity.id) ?? 0) >= risk.fire.crews) continue
+        // A fire brigade sends more (see `Upgrade.crews`).
+        const crews = upgradeAt(kinds.firewatch, watch.data.upgraded.value()?.level ?? 0)?.crews ?? risk.fire.crews
+        if ((out.get(watch.entity.id) ?? 0) >= crews) continue
         const starts = doors(grid, watch.data.tile.get())
         if (starts.length === 0) continue
         const roads = reach(grid, starts)
@@ -313,7 +323,6 @@ export const Hazards = Game.System(
       news(`${where(f)}的火灾：${took.length > 0 ? `${took.join("和")}被烧毁` : "已扑灭"}。`, { x: f.x, y: f.y })
     }
     resources.fires.set({ fires: fires.fires.filter((f) => stillBurning.has(f.id)), next: fires.next })
-    resources.rng.set(random.state)
   }
 )
 
@@ -326,23 +335,24 @@ const BurningRead = Game.Query({ selection: { tile: Game.Query.read(Tile), burni
 export const Douse = Game.System(
   "Town/Douse",
   {
-    queries: { crews: Game.Query({ selection: { route: Game.Query.write(Route), rescue: Game.Query.write(Rescue) } }) },
-    resources: { fires: Game.System.writeResource(Fires) }
+    queries: { crews: Game.Query({ selection: { route: Game.Query.write(Route), rescue: Game.Query.write(Rescue) } }), burning: BurningRead },
+    resources: { fires: Game.System.writeResource(Fires) },
+    commands: Game.System.commands(Game.System.spawns(Ruin), Game.System.despawns(Rescue, Burning))
   },
-  ({ queries, resources, commands, lookup }) => {
+  ({ queries, resources, commands }) => {
     for (const { entity, data } of queries.crews.each()) {
       const route = data.route.get()
       const rescue = data.rescue.get()
       const arrived = route.index >= route.cells.length - 1
       if (!arrived) continue
       if (rescue.back) {
-        commands.despawn(entity.id)
+        commands.despawn(entity)
         continue
       }
-      const target = lookup.getHandle(rescue.target, BurningRead)
+      const target = queries.burning.getHandle(rescue.target)
       if (target.ok) {
         const b = target.value.data.burning.get()
-        commands.despawn(target.value.entity.id)
+        commands.despawn(target.value.entity)
         commands.spawn(ruinDraft(target.value.data.tile.get(), "burnt"))
         const house = target.value.data.house.present
         resources.fires.update((f) => ({

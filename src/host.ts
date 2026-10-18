@@ -5,7 +5,6 @@
  */
 import { Application, Graphics } from "pixi.js"
 
-import { drawParkPiece } from "./art.ts"
 import {
   categoryColor,
   categoryOrder,
@@ -31,7 +30,7 @@ import {
   needTitle,
   LEDGER_TICKS,
   RESERVE_MAX,
-  STEP_SECONDS,
+  step,
   TRADE_LOAD,
   ROAD_COST,
   sizeIds,
@@ -53,7 +52,7 @@ import { GRID } from "./iso.ts"
 import { goodIcon, icon, iconEl, type IconName } from "./icons.ts"
 import { generate } from "./mapgen.ts"
 import { askOf, priceOf } from "./sim/index.ts"
-import type { Group, Line, Stats, Tool, TradeMode, UiValue, View } from "./ui.ts"
+import type { Group, Line, Panel, Stats, Tool, TradeMode, UiValue, View } from "./ui.ts"
 import { emptyPreview } from "./ui.ts"
 import { GameScene, type CameraView } from "./render3d/scene.ts"
 import { blobOf, cardFacts, drawCard, metaOf, scaled, verdictOf } from "./share/card.ts"
@@ -61,9 +60,7 @@ import { handheld, offerLink, offerPicture, upload } from "./share/client.ts"
 import { PICTURE_HEIGHT, PICTURE_QUALITY, PICTURE_WIDTH } from "./share/format.ts"
 import { MapInput } from "./render3d/input.ts"
 import { portrait } from "./render3d/portrait.ts"
-import { serviceBuilding } from "./asset-lab/service-upgrades.ts"
-import { makeBuilding } from "./asset-lab/buildings.ts"
-import { house } from "./asset-lab/homes.ts"
+import { pictureAsset } from "./render3d/models.ts"
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text = "") => {
   const node = document.createElement(tag)
@@ -216,12 +213,13 @@ export const createHost = async (
     flour: "由磨坊生产；面包坊将其烤成面包",
     bread: "市民所需的食物；供应面包的移民小屋税收增加50%；会逐渐腐坏，但比鲜鱼耐储存",
     wool: "牧羊场剪取羊毛；织布坊将其织成布料",
-    cloth: "市民需要布料；仅向宜居度达到5的街区配送"
+    cloth: "市民的需求：只配送到宜居度至少为 5 的街区",
+    furniture: "富裕市民的需求：木工坊用木板制作家具，只配送到宜居度适合市民宅邸的街区"
   }
   const groups: ReadonlyArray<ReadonlyArray<GoodId>> = [
     ["wood", "planks", "stone", "ore", "tools"],
     ["fish", "smoked", "wheat", "flour", "bread"],
-    ["wool", "cloth"]
+    ["wool", "cloth", "furniture"]
   ]
   stock.title = "仓储物资及其变化趋势 · 点击查看生产与消耗"
   const goodCells = new Map<GoodId, HTMLElement>()
@@ -393,6 +391,7 @@ export const createHost = async (
   const ui: UiValue = {
     tool: "select",
     placing: null,
+    upgrading: null,
     ground: "lawn",
     prop: "lamp",
     menu: null,
@@ -413,6 +412,7 @@ export const createHost = async (
     view: "none",
     overlay: { key: "", cells: [] },
     tints: new Map(),
+    wanted: new Map(),
     legend: null,
     flash: null,
     // Long enough to read (about 15 letters a second, and a moment to look), and gone as soon as the mayor
@@ -609,7 +609,7 @@ export const createHost = async (
 
   const refreshTools = () => {
     for (const { tool, button } of buttons) {
-      const on = tool.tool === "build" ? ui.menu === "build" || ui.tool === "place" || ui.tool === "ground" || ui.tool === "prop" : tool.tool === ui.tool
+      const on = tool.tool === "build" ? ui.menu === "build" || ui.tool === "place" || ui.tool === "ground" || ui.tool === "prop" || ui.tool === "upgrade" : tool.tool === ui.tool
       button.classList.toggle("on", on)
     }
     townButton.classList.toggle("on", ui.menu === "town")
@@ -618,6 +618,7 @@ export const createHost = async (
     ui.tool = tool
     ui.dragFrom = null
     if (tool !== "place") ui.placing = null
+    if (tool !== "upgrade") ui.upgrading = null
     if (tool !== "select") ui.selected = null
     refreshTools()
   }
@@ -733,21 +734,16 @@ export const createHost = async (
     return url
   }
   const both = { right: true, left: true }
-  const picture = (what: KindId | Tier | `park:${GroundId | PropId}`, upgraded = false): HTMLImageElement => {
+  const picture = (what: KindId | Tier | `park:${GroundId | PropId}`, level: number | boolean = 0): HTMLImageElement => {
     const img = document.createElement("img")
     img.className = "thumb"
     img.alt = ""
-    const id = `${String(what)}${upgraded ? "/upgraded" : ""}`
+    const lvl = Number(level), upgraded = lvl > 0
+    const id = `${String(what)}${upgraded ? `/upgraded${lvl}` : ""}`
     let url = pictures.get(id)
     if (!url) {
-      if (typeof what === "string" && what.startsWith("park:")) {
-        const g = new Graphics()
-        drawParkPiece(g, what.slice(5) as GroundId | PropId)
-        url = app.renderer.extract.base64({ target: g, resolution: 2 })
-        void url.finally(() => g.destroy())
-      } else if (what === 1 || what === 2 || what === 3) url = modelPicture(() => house(what, undefined, undefined, { doors: { right: true } }))
-      else if (upgraded && (what === "market" || what === "chapel")) url = modelPicture(() => serviceBuilding(what, 2, { doors: both }))
-      else url = modelPicture(() => makeBuilding(what as KindId, { doors: both, motion: false }))
+      // The model the map draws, as it stands: one source for the map and every picture of it.
+      url = modelPicture(() => pictureAsset(what, lvl))
       pictures.set(id, url)
     }
     void url.then((src) => (img.src = src))
@@ -913,7 +909,7 @@ export const createHost = async (
     const parks = section(
       "公园",
       "decor",
-      `先铺地面，再摆放设施。相连地面组成一座公园，设施越丰富，周围街区的宜居度越高（市民住宅需要 ${home.tiers[2].appeal}，市民宅邸需要 ${home.tiers[3].appeal}）。每 ${parkRules.cellsPerProp} 格地面可计入一件设施。`
+      `先铺地面，再摆放设施。相连地面组成一座公园，设施越丰富，周围宜居度越高（市民住宅需要 ${home.tiers[2].appeal}，市民宅邸需要 ${home.tiers[3].appeal}）。每 ${parkRules.cellsPerProp} 格地面可计入一件设施；多座公园的影响重叠时，最优公园全额计入。`
     )
     parks.style.borderTop = "3px solid #4f9a6a"
     const pieces: ReadonlyArray<{ readonly id: GroundId | PropId; readonly piece: ParkPiece; readonly pick: () => void; readonly ground: boolean }> = [
@@ -968,7 +964,7 @@ export const createHost = async (
 
     // The town's rank, the goals that raise it to the next, and how near each one is.
     const goals = section(
-      "goals",
+      "晋升目标",
       "goal",
       "城镇由聚落逐步发展为村庄、城镇和城市。同时满足下一级的全部目标并保持两分钟，即可晋级并获得王室奖励。晋级不会结束游戏，已获得的等级也不会降低。"
     )
@@ -994,7 +990,7 @@ export const createHost = async (
     const treasury = section(
       "财政",
       "treasury",
-      "以下为每分钟收支。有食物的住宅才缴税，税额随需求满足程度变化。行政开支按住宅计收，增长快于城镇规模：城镇较大时，新建一栋移民小屋的税收可能仅够支付新增行政开支；市民住宅和市民宅邸则能以相同的行政成本容纳两倍或三倍人口。连续负债三分钟将导致破产。"
+      "以下为每分钟收支。有食物的住宅才缴税，税额随需求满足程度变化。行政开支按入住居民计算，人口越多，人均行政开支越高。行会大厅与城市政厅可减免行政开支。应提高居民需求满足程度和市民占比，避免盲目扩张。连续负债三分钟将导致破产。"
     )
     const taxes = row(treasury, "税收", "taxes")
     const supplied = row(treasury, "需求全部满足时", "homes")
@@ -1064,19 +1060,22 @@ export const createHost = async (
     const needs = section(
       "需求满足情况",
       "homes",
-      "挨饿的住宅不缴税。移民需要市场供应鲜鱼、熏鱼或面包；小屋获得面包后，税收另增 50%。每次送餐按每四位居民一份食物计算，不足四人也算一份；满员的市民住宅消耗为小屋的两倍，市民宅邸为三倍。市民和富裕市民需要面包、布料与信仰。布料只送往宜居度至少为 5 的街区。鲜鱼和面包会逐渐腐坏，鲜鱼腐坏更快；粮仓可将腐坏速度降至原来的五分之一。"
+      "挨饿的住宅不缴税。移民需要市场供应鲜鱼、熏鱼或面包；小屋获得面包后，税收增加50%。每次送餐按每四位居民一份计算，向上取整；满员市民住宅的消耗为小屋的两倍，市民宅邸为三倍。市民需要面包、布料与信仰，富裕市民还需要木工坊生产的家具。布料只配送到宜居度至少为5的街区，家具则至少需要12。鲜鱼与面包会逐渐腐坏，鲜鱼更快；粮仓可将腐坏速度降至五分之一。"
     )
-    const needIcons: Readonly<Record<"food" | "bread" | "cloth" | "faith", IconName>> = {
+    const needIcons: Readonly<Record<"food" | "bread" | "cloth" | "faith" | "furniture", IconName>> = {
       food: "fish",
       bread: "bread",
       cloth: "cloth",
-      faith: "faith"
+      faith: "faith",
+      furniture: "furniture"
     }
-    const bars = (["food", "bread", "cloth", "faith"] as const).map((n) => {
+    const bars = (["food", "bread", "cloth", "faith", "furniture"] as const).map((n) => {
       const line = el("div", "need")
+      // The icon alone says which need: the name is its tooltip, so no word runs under the bar.
       const label = el("span", "label")
       label.innerHTML = icon(needIcons[n], 16)
-      label.append(document.createTextNode(needTitle[n]))
+      label.title = needTitle[n]
+      label.setAttribute("aria-label", needTitle[n])
       const track = el("span", "track")
       const fill = el("span", "fill")
       track.append(fill)
@@ -1112,7 +1111,7 @@ export const createHost = async (
     reserve.input.title = "每种物资的保留量：只出售超过此数量的库存，只购买至此数量"
     store.append(reserveLine, reserve.input, el("p", "effect", "每种物资均适用：超过保留量才出售，不足时最多购入至保留量"))
     /** Collections a minute: the traders come at every ledger. */
-    const perMinute = 60 / (LEDGER_TICKS * STEP_SECONDS)
+    const perMinute = 60 / (LEDGER_TICKS * step.dt)
     const goodRows = goodIds.map((g) => {
       const line = el("div", "trade-row")
       const name = el("span", "label")
@@ -1211,10 +1210,12 @@ export const createHost = async (
         ? "所有工作场所人手充足"
         : `${s.shortStaffed.length} 处缺少工人：${s.shortStaffed.slice(0, 4).map((w) => `${w.title} ${w.assigned}/${w.needed}${w.nobodyNear ? "（范围内无人）" : ""}`).join("、")}${s.shortStaffed.length > 4 ? "、…" : ""} · 点击就业人数逐一定位`
       for (const b of bars) {
-        const share = s.homes > 0 ? s.needs[b.n] / s.homes : 0
+        // Furniture is counted against the townhouses: no other home keeps it.
+        const of = b.n === "furniture" ? Math.max(s.townhouses, s.needs.furniture) : s.homes
+        const share = of > 0 ? s.needs[b.n] / of : 0
         b.fill.style.width = `${Math.round(share * 100)}%`
-        b.fill.className = `fill ${share < 0.34 ? "none" : share < 0.67 ? "low" : ""}`
-        b.value.textContent = `${s.needs[b.n]}/${s.homes}`
+        b.fill.className = `fill ${of === 0 ? "" : share < 0.34 ? "none" : share < 0.67 ? "low" : ""}`
+        b.value.textContent = `${s.needs[b.n]}/${of}`
       }
       larderLine.textContent = `${s.larder}`
       eatenLine.textContent = `${s.eaten} · ${s.rotted}`
@@ -1275,6 +1276,20 @@ export const createHost = async (
     row.querySelector<HTMLElement>(".what")!.textContent = l.label
     if (!chips) row.querySelector<HTMLElement>(".count")!.innerHTML = iconize(escapeHtml(l.value ?? ""))
     if (l.note) row.querySelector<HTMLElement>(".note")!.innerHTML = iconize(escapeHtml(l.note))
+    // What to do about it, on a row of its own: a building to place shows its picture, and the row places one.
+    if (l.fix) {
+      const build = l.fix.build && kinds[l.fix.build].buildable ? l.fix.build : undefined
+      const fix = el(build ? "button" : "div", "fix")
+      if (build) {
+        fix.dataset.build = build
+        fix.title = `建造${kinds[build].title.toLowerCase()}`
+        fix.append(picture(build))
+      } else fix.append(iconEl("hint", 14))
+      const text = el("span", "do")
+      text.innerHTML = iconize(callouts(l.fix.text))
+      fix.append(text)
+      row.append(fix)
+    }
   }
   /** Keeps a box of rows in step with its lines, touching only the rows that changed. */
   const syncLines = (box: HTMLElement, rows: Array<HTMLElement>, lines: ReadonlyArray<Line>) => {
@@ -1293,6 +1308,64 @@ export const createHost = async (
     })
   }
 
+  /** What upgrading a building would give and cost, said in full before the mayor pays for it, with the button that begins it. */
+  /** An upgrade's gain as a row: what changes, on the left; from what to what, on the right. */
+  const gainLine = (change: string): Line => {
+    const at = change.search(/[+−-]?\d/)
+    const label = at > 0 ? change.slice(0, at).trim() : change, rest = at > 0 ? change.slice(at) : undefined
+    // "+6 → +8, out to 6 cells": the change on the right, what qualifies it under it.
+    const [value, note] = rest?.includes("，") ? [rest.slice(0, rest.indexOf("，")), rest.slice(rest.indexOf("，") + 1)] : [rest, undefined]
+    const glyph: IconName =
+      /^每种物资容量/.test(change) ? "build" : /^运输员/.test(change) ? "trade" : /^服务范围|^服务人员/.test(change) ? "people"
+      : /^行政开支/.test(change) ? "taxes" : /^周围宜居度/.test(change) ? "appeal" : /^工人/.test(change) ? "workers"
+      : /^消防员/.test(change) ? "fire" : /采空矿面/.test(change) ? "stone" : /每分钟/.test(change) ? "jobs" : "goal"
+    return { icon: glyph, label, value, note, tone: "ok" }
+  }
+  /**
+   * What upgrading a building would cost and give, said in full before the mayor pays: what is paid now, what
+   * carriers bring later and the upkeep after; then what it gives. The button that begins it comes last, alone.
+   */
+  const upgradeBox = (offer: NonNullable<Extract<Panel, { type: "building" }>["upgrade"]>) => {
+    const box = section(`升级为${offer.title.toLowerCase()}`, "build", offer.blurb)
+    box.classList.add("lines", "upgrade")
+    // Why the town needs it now (the gold arrow over it), or that it can wait.
+    const needed = el("p", "needed", "")
+    const pays = el("div", "part"), gets = el("div", "part")
+    const payRows: Array<HTMLElement> = [], getRows: Array<HTMLElement> = []
+    const upkeep = offer.changes.find((c) => c.startsWith("每分钟维护费"))
+    syncLines(gets, getRows, offer.changes.filter((c) => c !== upkeep).map(gainLine))
+    const begin = el("button", "frame primary", `开始建造${offer.title.toLowerCase()}`)
+    begin.onclick = () => {
+      const now = ui.panel
+      if (now?.type === "building") ui.edits.push({ type: "upgrade", cell: now.cell })
+    }
+    const why = el("p", "sub", "")
+    live.push(() => {
+      const now = ui.panel
+      if (now?.type !== "building" || !now.upgrade) return
+      needed.textContent = now.upgrade.needed ? `当前需要：${now.upgrade.needed}` : "暂不急需，出现需求时会显示金色箭头"
+      needed.classList.toggle("now", now.upgrade.needed !== null)
+      const coins = ui.stats?.coins ?? 0, stock = ui.stats?.stock
+      const materials = (Object.entries(offer.cost.materials) as Array<[GoodId, number]>).filter(([, n]) => n > 0)
+      const lacking = materials.filter(([g, n]) => (stock?.[g] ?? 0) < n).map(([g, n]) => `${n - (stock?.[g] ?? 0)} ${goods[g].title}`)
+      syncLines(pays, payRows, [
+        { icon: "coins", label: "开工时支付", value: `${offer.cost.coins} 金币`, tone: coins < offer.cost.coins ? "bad" : undefined,
+          note: coins < offer.cost.coins ? `还缺 ${offer.cost.coins - coins} 金币` : undefined },
+        ...(materials.length > 0
+          ? [{ icon: "trade", label: "随后送达的建材", goods: materials.map(([good, count]) => ({ good, count })), tone: lacking.length > 0 ? "warn" : undefined,
+              note: lacking.length > 0 ? `库存还缺 ${lacking.join("、")}，施工按材料送达推进，材料不足时将在对应进度等待` : "运输员从仓储送来材料，施工随材料送达推进" } as Line]
+          : []),
+        ...(upkeep ? [{ icon: "upkeep", label: "升级后维护费", value: upkeep.replace(/^每分钟维护费 /, "") } as Line] : [])
+      ])
+      begin.disabled = now.upgrade.blocked !== null || now.upgrade.short !== null
+      why.textContent = now.upgrade.blocked ?? now.upgrade.short ?? "施工期间建筑继续工作，脚手架搭建在原有地块内"
+    })
+    const footer = el("div", "begin")
+    footer.append(begin, why)
+    box.append(needed, el("p", "cap", "需要支付"), pays, el("p", "cap", "升级效果"), gets, footer)
+    return box
+  }
+
   const buildPanel = () => {
     const p = ui.panel
     live = []
@@ -1301,14 +1374,13 @@ export const createHost = async (
     if (p.type === "build") return buildMenu()
     if (p.type === "town") return townPanel()
 
-    const upgrade = p.type === "building" && p.upgraded ? kinds[p.kind].upgrade : undefined
-    const title = p.type === "building" ? (upgrade ?? kinds[p.kind]).title.toLowerCase() : p.type === "house" ? tierHome[p.tier] : p.type === "park" ? "公园" : "废墟"
+    const title = p.type === "building" ? p.title.toLowerCase() : p.type === "house" ? tierHome[p.tier] : p.type === "park" ? "公园" : "废墟"
     const status = el("span", "pill")
     const about = el(
       "p",
       "sub",
       p.type === "building"
-        ? (upgrade ?? kinds[p.kind]).blurb
+        ? p.blurb
         : p.type === "ruin"
           ? "拆除废墟以清理地块"
           : p.type === "park"
@@ -1320,8 +1392,24 @@ export const createHost = async (
               : "富裕市民居住于此，基础税额最高"
     )
     const below = el("div", "")
-    below.append(status, about)
-    panel.append(header(title, p.type === "ruin" ? iconEl("condition", 30) : p.type === "park" ? iconEl("decor", 30) : picture(p.type === "building" ? p.kind : p.tier, p.type === "building" && p.upgraded), below))
+    // A building says how it is in a box of its own, under the header; a home, a park, or a ruin in a word here.
+    if (p.type === "building") below.append(about)
+    else below.append(status, about)
+    panel.append(header(title, p.type === "ruin" ? iconEl("condition", 30) : p.type === "park" ? iconEl("decor", 30) : picture(p.type === "building" ? p.kind : p.tier, p.type === "building" ? p.level : 0), below))
+    // A building: how it is first, and what to do about it; then its upgrade, when it has one to offer.
+    if (p.type === "building") {
+      const box = section("运行状态", p.problem !== null ? "warning" : "jobs")
+      box.classList.add("lines", "state")
+      const rows: Array<HTMLElement> = []
+      live.push(() => {
+        const now = ui.panel
+        if (now?.type !== "building") return
+        box.classList.toggle("trouble", now.problem !== null)
+        syncLines(box, rows, [now.state])
+      })
+      panel.append(box)
+    }
+    if (p.type === "building" && p.upgrade) panel.append(upgradeBox(p.upgrade))
     // A building or a home: its rows in boxes under headings, kept in step with what the town says each frame.
     // A park or a ruin: one box.
     const holder = el("div", "")
@@ -1366,7 +1454,8 @@ export const createHost = async (
         syncGroups([{ title: "残留情况", icon: "condition", lines: now.lines }])
       }
     })
-    if (!(p.type === "building" && p.kind === "townhall")) {
+    if (p.type === "building" && p.kind === "townhall") return
+    {
       const actions = el("div", "actions")
       if (p.type === "building") {
         const pause = el("button", "frame", "暂停工作")
@@ -1382,21 +1471,6 @@ export const createHost = async (
           pause.style.display = now.pausable ? "" : "none"
         })
         actions.append(pause)
-        // A building that can be upgraded where it stands (see `Kind.upgrade`).
-        if (p.upgrade) {
-          const up = el("button", "frame primary", `升级为${p.upgrade.title.toLowerCase()}`)
-          up.onclick = () => {
-            const now = ui.panel
-            if (now?.type === "building") ui.edits.push({ type: "upgrade", cell: now.cell })
-          }
-          live.push(() => {
-            const now = ui.panel
-            if (now?.type !== "building" || !now.upgrade) return
-            up.disabled = now.upgrade.blocked !== null
-            up.title = `${kinds[now.kind].upgrade?.blurb ?? ""} · ${now.upgrade.cost}${now.upgrade.blocked ? ` · ${now.upgrade.blocked}` : ""}`
-          })
-          actions.append(up)
-        }
       }
       if (p.type === "house") {
         const close = el("button", "frame", "关闭住宅")
@@ -1432,7 +1506,7 @@ export const createHost = async (
         ? ""
         : p.type === "build" || p.type === "town"
           ? p.type
-          : `${p.type}|${p.id}|${p.type === "house" ? p.tier : p.type === "building" ? `${p.upgraded}|${p.upgrade !== null}` : ""}`
+          : `${p.type}|${p.id}|${p.type === "house" ? p.tier : p.type === "building" ? `${p.level}|${p.upgrade?.title ?? ""}|${p.works !== null}` : ""}`
     if (next !== shape) {
       shape = next
       // Keep the old contents while the closed panel slides away.
@@ -1538,8 +1612,8 @@ export const createHost = async (
         "pave",
         sizeIds,
         (v) => sizes[v].title,
-        (v) => `城镇等级目标 ${chip("people", `${sizes[v].goal.residents} 位居民`)}${chip("coins", `${sizes[v].goal.coins} 金币`)}`,
-        (v) => `城镇等级需要 ${sizes[v].goal.residents} 位居民与 ${sizes[v].goal.coins} 金币；村庄要求较低，城市要求更高`,
+        (v) => `城镇等级目标 ${chip("people", `${sizes[v].goal.residents} 位居民`)}${chip("coins", `+${sizes[v].goal.income}/分钟`)}`,
+        (v) => `城镇等级需要 ${sizes[v].goal.residents} 位居民和每分钟 ${sizes[v].goal.income} 金币的净收入；村庄要求较低，城市要求更高`,
         () => choice.size,
         (v) => (choice.size = v)
       ),
@@ -1884,6 +1958,18 @@ export const createHost = async (
     ui.menu = null
     choose(id === "homes" ? "home" : (id as Tool))
   }
+  // A panel row's fix: place the building it names, or pick the tool or panel it names.
+  panel.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement
+    const tool = target.closest<HTMLElement>(".fix [data-tool]")
+    if (tool) return useTool(tool.dataset.tool!)
+    const build = target.closest<HTMLElement>("[data-build], .fix [data-kind]")
+    const kind = (build?.dataset.build ?? build?.dataset.kind) as KindId | undefined
+    if (kind && kinds[kind].buildable) {
+      ui.selected = null
+      place(kind)
+    }
+  })
   /** Ticker lines the mayor has put away, by what they say (and, for news, when). */
   const dismissed = new Set<string>()
   let tickerLines: { guide: Stats["guide"]["step"]; alerts: Stats["alerts"]; news: Stats["chronicle"] } = { guide: null, alerts: [], news: [] }

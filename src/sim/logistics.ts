@@ -1,5 +1,6 @@
+import { every } from "../content.ts"
 import { transport } from "../rules/config.ts"
-import { wantsCitizenGoods } from "../rules/households.ts"
+import { wantsBurgherGoods, wantsCitizenGoods } from "../rules/households.ts"
 import { appealAt } from "../appeal.ts"
 import { preferDelivery } from "../rules/transport.ts"
 /**
@@ -13,7 +14,7 @@ import { preferDelivery } from "../rules/transport.ts"
 import { goodIds, provisions, type GoodId } from "../content.ts"
 import { doors, nearest, pathTo, reach, key, type Reach } from "../grid.ts"
 import type { Point } from "../iso.ts"
-import { Building, Burning, Carriers, Errand, Figure, Game, Rules, Grid, House, Appeal, Inventory, Recipe, Rising, Route, Service, Site, Storage, Tile, Time, WalkerOf, maybe } from "../schema.ts"
+import { Building, Burning, Carriers, Errand, Figure, Game, Rules, Grid, House, Appeal, Inventory, Recipe, Rising, Route, Service, Site, Storage, Tile, Time, WalkerOf, Works } from "../schema.ts"
 import { CELL_STEPS } from "./shared.ts"
 
 /** The most a carrier takes at once. */
@@ -49,16 +50,18 @@ export const Dispatch = Game.System(
       }),
       homes: Game.Query({ selection: { tile: Game.Query.read(Tile), house: Game.Query.read(House) }, without: [Site, Rising, Burning] }),
       sites: Game.Query({ selection: { tile: Game.Query.read(Tile), site: Game.Query.read(Site) } }),
+      works: Game.Query({ selection: { tile: Game.Query.read(Tile), works: Game.Query.read(Works) }, without: [Burning] }),
       errands: Game.Query({ selection: { errand: Game.Query.read(Errand), home: Game.Query.readRelation(WalkerOf) } })
     },
     resources: { grid: Game.System.readResource(Grid), appeal: Game.System.readResource(Appeal), time: Game.System.readResource(Time) },
-    services: { rules: Game.System.service(Rules) }
+    services: { rules: Game.System.service(Rules) },
+    commands: Game.System.commands(Game.System.spawns(Errand), Game.System.relates(WalkerOf))
   },
   ({ queries, resources, commands, services }) => {
     const rules = services.rules
     const { kinds, goods, spoils, toolStock: TOOL_STOCK } = rules
 
-    if (resources.time.get().tick % DISPATCH_TICKS !== 0) return
+    if (!every(resources.time.get(), DISPATCH_TICKS)) return
     const grid = resources.grid.get()
     const out = new Map<number, number>()
     const incoming = new Map<string, number>()
@@ -86,16 +89,22 @@ export const Dispatch = Game.System(
       const ds = doors(grid, data.tile.get())
       for (const g of goodIds) if (site.owed[g] > 0) wants.push({ id: entity.id, doors: ds, good: g, site: true, want: () => site.owed[g] - inbound(entity.id, g) })
     }
+    // An upgrade under way is building work too: its materials go before anyone's shelves.
+    for (const { entity, data } of queries.works.each()) {
+      const works = data.works.get()
+      const ds = doors(grid, data.tile.get())
+      for (const g of goodIds) if (works.owed[g] > 0) wants.push({ id: entity.id, doors: ds, good: g, site: true, want: () => works.owed[g] - inbound(entity.id, g) })
+    }
     const sitesWant = new Set(wants.filter((w) => w.want() > 0).map((w) => w.good))
     const rooms: Array<{ readonly id: Id; readonly doors: ReadonlyArray<Point>; readonly room: (g: GoodId) => number; readonly keeps: boolean }> = []
     for (const { entity, data } of queries.wanting.each()) {
-      const inventory = maybe(data.inventory)
+      const inventory = data.inventory.value()
       if (!inventory) continue
       const ds = doors(grid, data.tile.get())
       if (ds.length === 0) continue
-      const recipe = maybe(data.recipe)
+      const recipe = data.recipe.value()
       const space = (g: GoodId) => (inventory.accepts.includes(g) ? inventory.cap - inventory.stock[g] - inbound(entity.id, g) : 0)
-      const kind = maybe(data.building)?.kind
+      const kind = data.building.value()?.kind
       if (data.storage.present) {
         rooms.push({ id: entity.id, doors: ds, room: space, keeps: kind !== undefined && (kinds[kind].keeps ?? 0) > 1 })
       }
@@ -105,15 +114,21 @@ export const Dispatch = Game.System(
       }
       // A workshop that wears out tools keeps a couple on hand.
       if (kind !== undefined && kinds[kind].wear) wants.push({ id: entity.id, doors: ds, good: "tools", site: false, want: () => TOOL_STOCK - inventory.stock.tools - inbound(entity.id, "tools"), fill: () => (inventory.stock.tools + inbound(entity.id, "tools")) / TOOL_STOCK })
-      const service = maybe(data.service)?.service
+      const service = data.service.value()?.service
       if (service === "goods") {
-        const roads = reach(grid, [ds[0]!]), range = maybe(data.service)!.range
-        const citizenDistrict = queries.homes.each().some(({ data: h }) => {
+        const roads = reach(grid, [ds[0]!]), range = data.service.value()!.range
+        let citizenDistrict = false, burgherDistrict = false
+        for (const { data: h } of queries.homes.each()) {
           const tile = h.tile.get(), found = nearest(roads, doors(grid, tile))
-          return found !== null && found.distance < range && wantsCitizenGoods(h.house.get(), appealAt(resources.appeal.get().cells, tile.x, tile.y), rules)
-        })
+          if (found === null || found.distance >= range) continue
+          const desirability = appealAt(resources.appeal.get().cells, tile.x, tile.y)
+          citizenDistrict ||= wantsCitizenGoods(h.house.get(), desirability, rules)
+          burgherDistrict ||= wantsBurgherGoods(h.house.get(), desirability, rules)
+          if (burgherDistrict) break
+        }
         for (const g of provisions) {
           if (g === "cloth" && !citizenDistrict) continue
+          if (g === "furniture" && !burgherDistrict) continue
           const cap = Math.min(inventory.cap, rules.transport.basket)
           wants.push({ id: entity.id, doors: ds, good: g, site: false,
             want: () => cap - inventory.stock[g] - inbound(entity.id, g), fill: () => (inventory.stock[g] + inbound(entity.id, g)) / cap })
@@ -141,7 +156,7 @@ export const Dispatch = Game.System(
       const roads = reach(grid, starts)
       const inventory = data.inventory.get()
       let stock = inventory.stock
-      const recipe = maybe(data.recipe)
+      const recipe = data.recipe.value()
 
       // A storage meets demands with what it holds; anyone else sends on what it made.
       // A producer waits for a full load (or a full shelf) so its carriers do not walk with one crate.
@@ -164,7 +179,7 @@ export const Dispatch = Game.System(
         // Food that spoils goes to a granary if there is one in reach, before the nearest storage; a
         // storage that does not keep food sends it on to a granary that does.
         const perishable = spoils[good] !== undefined
-        const senderKeeps = (kinds[maybe(data.building)?.kind ?? "townhall"].keeps ?? 0) > 1
+        const senderKeeps = (kinds[data.building.value()?.kind ?? "townhall"].keeps ?? 0) > 1
         if (best === null && (!data.storage.present || (perishable && !senderKeeps))) {
           let kept = false
           for (const r of rooms) {
@@ -202,7 +217,7 @@ export const turnAround = (route: { readonly cells: ReadonlyArray<Point>; readon
 const TargetRead = Game.Query({ selection: { tile: Game.Query.read(Tile) } })
 
 /**
- * A carrier hands its crate over: to a site, towards what it is owed; to
+ * A carrier hands its crate over: to a site or an upgrade under way, towards what it is owed; to
  * anyone else, as much as they have room for. Then it walks back, and puts
  * whatever it still carries back where it came from.
  */
@@ -211,12 +226,15 @@ export const Deliver = Game.System(
   {
     queries: {
       carriers: Game.Query({ selection: { route: Game.Query.write(Route), errand: Game.Query.write(Errand), home: Game.Query.readRelation(WalkerOf) } }),
+      targets: TargetRead,
       inventories: Game.Query({ selection: { inventory: Game.Query.write(Inventory) }, without: [Site] }),
-      sites: Game.Query({ selection: { site: Game.Query.write(Site) } })
+      sites: Game.Query({ selection: { site: Game.Query.write(Site) } }),
+      works: Game.Query({ selection: { works: Game.Query.write(Works) } })
     },
-    services: { rules: Game.System.service(Rules) }
+    services: { rules: Game.System.service(Rules) },
+    commands: Game.System.commands(Game.System.despawns(Errand))
   },
-  ({ queries, commands, lookup, services }) => {
+  ({ queries, commands, services }) => {
     const rules = services.rules
     const {  } = rules
 
@@ -231,10 +249,10 @@ export const Deliver = Game.System(
           const room = inv.cap - inv.stock[errand.good]
           home.value.data.inventory.set({ ...inv, stock: { ...inv.stock, [errand.good]: inv.stock[errand.good] + Math.min(room, errand.count) } })
         }
-        commands.despawn(entity.id)
+        commands.despawn(entity)
         continue
       }
-      const target = lookup.getHandle(errand.target, TargetRead)
+      const target = queries.targets.getHandle(errand.target)
       if (!target.ok) {
         // Nowhere to take it: carry it home.
         data.route.set(turnAround(route))
@@ -244,8 +262,13 @@ export const Deliver = Game.System(
       if (!arrived(route)) continue
       let handed = 0
       const site = queries.sites.get(target.value.entity.id)
+      const works = queries.works.get(target.value.entity.id)
       const inventory = queries.inventories.get(target.value.entity.id)
-      if (site.ok) {
+      if (works.ok && works.value.data.works.get().owed[errand.good] > 0) {
+        const w = works.value.data.works.get()
+        handed = Math.min(errand.count, w.owed[errand.good])
+        works.value.data.works.set({ ...w, owed: { ...w.owed, [errand.good]: w.owed[errand.good] - handed } })
+      } else if (site.ok) {
         const s = site.value.data.site.get()
         handed = Math.min(errand.count, s.owed[errand.good])
         site.value.data.site.set({ ...s, owed: { ...s.owed, [errand.good]: s.owed[errand.good] - handed } })

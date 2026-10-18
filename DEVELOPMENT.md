@@ -3,7 +3,7 @@
 [← back to the README](README.md)
 
 Inkline Town is a TypeScript game. The simulation runs on the
-[bevy-ts](https://github.com/SandroMaglione/bevy-ts) ECS at a fixed step and
+[Ritmo](https://github.com/typeonce-dev/ritmo) ECS at a fixed step and
 knows nothing of the page; [Three.js](https://threejs.org) draws the 3D world;
 Pixi renders the original menu thumbnails; saving is
 written with [Effect](https://effect.website).
@@ -13,8 +13,7 @@ pnpm install
 pnpm dev --host --port 5232
 pnpm typecheck
 pnpm test       # model-based tests: random mayors, rules that must always hold; and saving
-pnpm check      # every way a term can end, ends it
-pnpm check:shared-safety # shared chronicle text cannot execute markup in either panel
+pnpm check      # lint (oxlint and Ritmo's schedule lints), then every way a term can end, ends it
 pnpm check:browser # the actual 3D game: placement, picking, saves, populated towns and phone layout
 pnpm check:phone   # phone sizes: the picker's found button on screen, the folded HUD opens and closes
 pnpm balance    # a bot plays terms headless and reports the pressure
@@ -179,7 +178,24 @@ in the page's save slot from the console and press **load**:
 localStorage.setItem("inkline-town/save/manual", /* the file's contents */)
 ```
 
-That is how the README's screenshots of grown towns were made.
+`scripts/look-readme.ts` takes the README's pictures and film from such a
+save, through the real page with the news, overlays and camera buttons
+hidden. It runs on Playwright's clock, so the film steps the town exactly
+two thirtieths of a second a frame however slow the screenshot:
+
+```sh
+node scripts/balance.ts --size large --land rich --term 90 --seeds 3 --snapshot 80 --out snapshots
+SAVE=snapshots/large-rich-1000-80min.json RECKON=1 node scripts/look-readme.ts       # charter, town, street, panels, reckoning
+MODE=wide WIDE=0.75 NAME=large SAVE=... node scripts/look-readme.ts                  # one wide view of another town
+MODE=film SIZE=1600x900 SCALE=1 SAVE=... node scripts/look-readme.ts                 # 900 frames to output/look-readme/frames
+ffmpeg -framerate 30 -i output/look-readme/frames/%04d.png -vf "scale=960:-2,format=yuv420p" \
+  -c:v libsvtav1 -preset 4 -crf 46 -g 300 -f avif -loop 0 docs/media/inkline-town.avif
+ffmpeg -framerate 30 -i output/look-readme/frames/%04d.png -vf scale=1280:-2 \
+  -c:v libx264 -preset veryslow -tune animation -pix_fmt yuv420p -crf 28 -movflags +faststart docs/media/inkline-town.mp4
+```
+
+The README shows the film as an animated AVIF, because GitHub plays no
+`<video>` from the repository; browsers without AVIF see the still.
 
 ## Code
 
@@ -194,7 +210,8 @@ That is how the README's screenshots of grown towns were made.
 - `src/sim/`: the fixed-step simulation (no renderer access): edits, work (staffing by crew and commute, tools,
   pace), logistics, walkers (services, mending), town (households and tiers), hazards (desirability, risk
   meters, fire and firefighters, sickness, theft), decay (wear, collapse, spoilage, the pantry), and the term
-  (seasons and the almanac, the crown, approval, the end of the term, history).
+  (seasons and the almanac, the crown, approval, the end of the term, history); orphans drops a walker or field
+  whose building went before it could join it.
 - `src/present.ts`: per-frame interaction, panel, and view sync.
 - `src/art.ts`: all drawing: buildings and their yards, homes, the land, roads, carts, and figures.
 - `src/render3d/`: live world renderer, model instances, camera and map input,
@@ -260,13 +277,34 @@ rendered pixels, checks phone layout and exports a five-second MP4 to
 `output/inkline-3d/house-effects/`. The runtime and this preview share the
 same instanced renderer and effect code.
 
+The complete proportion comparison is at
+[`/proportion-review.html`](http://localhost:5232/proportion-review.html): 36
+building appearances and nine shared-prop examples, with the approved
+originals beside the revised geometry. Both sides share a camera and an
+unchanged walker. Turn, zoom, choose one scale across the catalogue, or save a
+comparison PNG. `/model-review.html?collection=handoff` turns the carpenter
+and building upgrades, compares scaffolding as materials arrive, and downloads
+their GLBs. `?collection=milestones` sets the town hall, guildhall and city
+hall side by side; `?collection=works` shows the one reusable construction
+scaffold on six building forms, its bays, platforms, ladders and supplies set
+by plot size, building height and delivered share.
+
 The original 2D menu drawings remain in `art.ts` for comparison. The live
 3D town uses the new geometry, including equipped service workers and cured
 fish cargo. The game has no audio, so winter music is outside this model work.
 
+Open `/proportion-review.html?collection=parks` for twelve park before/after
+comparisons. The original geometry and walker are frozen in
+`public/model-review/parks-before.json.gz` at `f4df9d5`; do not regenerate it
+from the revised models. `pnpm check:park-models` checks the paired viewer and
+captures front, rear and phone views in `output/inkline-3d/parks/`.
+Shared furnishings live in `park-furnishings.ts`, and park ground treatments
+in `park-ground.ts`. The bench and planted border also serve civic gardens;
+road setts and the park simulation rules are unchanged.
+
 Open `/park-lab.html` for a park assembled from 25 cells using the current
 park layout system, with two street entrances. The three retained furnishings
-are lamps, fountains and statues. The statue is a simple bust and pedestal;
+are framed lanterns, tiered fountains and simple stone busts;
 `render3d/fountain-effects.ts` supplies moving droplets and impact ripples in
 the actual basin. Park rendering in the game, catalogue, map and preview shares
 the same emitter metadata and water renderer. `pnpm check:park` verifies the
@@ -280,8 +318,13 @@ and a five-second MP4 in `output/inkline-3d/park-review/`.
   (the mayor's own, or the autosave), typed errors for each way a load can fail.
 - `src/ui.ts`, `src/host.ts`, `src/main.ts`: the page bridge, camera, input, panels, and start-up.
 
-The simulation runs on bevy-ts-browser's `FixedLoop` at 60 steps a second
-(times the chosen speed), with integer state and a seeded random resource.
+The simulation runs on Ritmo's `FixedLoop` at 60 steps a second (times the
+chosen speed), with integer state and a seeded random resource: `Town/Rng`,
+declared with `Descriptor.ConstructedResource(Random)` and started with
+`Random.seed(...)`. Systems draw with `Random.draw(resources.rng)`, which
+writes every draw back (and rolls it back with a failed system). Seeded
+streams that are not world state, such as the land in `mapgen.ts` and the
+almanac's winters, use `Random.make(seed)`.
 Every saved component and resource is validated, so **save** / **load**
 snapshot the whole world, history and chronicle included, to localStorage;
 the page also autosaves every two minutes of game time, and **load** takes
@@ -289,6 +332,29 @@ whichever is newer.
 
 In development the console has `town.ui`, `town.runtime`, and
 `town.advance(seconds)` to fast-forward the simulation.
+
+### Simulation rules and lint
+
+`pnpm lint` (part of `pnpm check`) runs oxlint with two plugins: the town's
+own (`tools/lint/plugin.mjs`: no `as never` or `as unknown as`) and
+[`@typeonce/oxlint-plugin-ritmo`](https://github.com/typeonce-dev/ritmo/tree/main/packages/oxlint-plugin).
+In every file, a `runtime.tick(...)` or `runtime.restore(...)` result is
+checked (`void` ignores one on purpose), descriptor and system names carry
+the `Town/` prefix, and an optional query cell is read with `cell.value()`.
+
+The simulation files, listed in the `overrides` of `.oxlintrc.json`
+(`src/sim/`, `src/rules/`, and the pure modules they run: `grid.ts`,
+`mapgen.ts`, `places.ts`, `appeal.ts`, `content.ts`, `schema.ts`,
+`archetypes.ts`, `iso.ts`), must replay exactly and run headless. They read
+time from the `Town/Time` clock and randomness from `Town/Rng` or a seeded
+`Random.make`, never `Date.now()` or `Math.random()`; they never touch the
+page, host I/O or the renderer; they keep `Infinity` and `NaN` out of data,
+which would save but not load; and they do engine-approximated math
+(`sin`, `cos`, `atan2`, `exp`, `hypot`, `a ** b`) with `Ops` from
+`@typeonce/ritmo-math`, which returns the same bits on every engine.
+`Math.sqrt`, `min`, `max`, `floor`, `abs` and `x ** 2` are exact everywhere
+and stay. A new module the simulation runs joins that list. `pnpm lint:game`
+then checks the schedules themselves with Ritmo's devtools lints.
 
 ## Balancing
 

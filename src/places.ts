@@ -10,7 +10,7 @@ const streetOf: Readonly<Record<KindId, string>> = {
   townhall: "市政", warehouse: "仓库", granary: "粮仓", lumberjack: "木材", forester: "森林", quarry: "采石",
   mine: "矿山", fishery: "渔人", smokehouse: "熏鱼", sawmill: "锯木", smithy: "铁匠", farm: "农场", mill: "磨坊",
   bakery: "面包", sheep: "牧羊", weaver: "织布", market: "集市", chapel: "教堂", firewatch: "消防", healer: "医馆",
-  hospital: "医院", watchhouse: "警员", builder: "工匠"
+  hospital: "医院", watchhouse: "治安", builder: "修缮", carpenter: "木工"
 }
 const suffixes = ["巷", "街", "里", "路", "坊", "步道"] as const
 

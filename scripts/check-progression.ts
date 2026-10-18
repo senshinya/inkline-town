@@ -24,6 +24,8 @@ town.run(0.5)
 const legacy = town.snapshot()
 const { term, began, rank, ...oldFate } = legacy.resources["Town/Fate"]
 legacy.resources["Town/Fate"] = { ...oldFate, state: "won", governing: false, won: 0 }
+legacy.version = 1
+legacy.resources["Town/Time"] = { tick: legacy.resources["Town/Time"].step }
 const executablePath = process.env.BROWSER_EXECUTABLE_PATH ?? ["/Applications/Brave Browser.app/Contents/MacOS/Brave Browser", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"].find(existsSync)
 const browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) })
 const errors: string[] = [], output = "output/inkline-3d/progression-check"
@@ -57,8 +59,11 @@ try {
     const entity = (await snap()).entities.find(e => e.components["Town/Building"]?.kind === kind)!
     await page.evaluate(id => { window.town.ui.selected = id; window.town.ui.menu = null }, entity.id)
     const title = kinds[kind].upgrade!.title
-    await page.getByRole("button", { name: `升级为${title}`, exact: true }).click()
-    await page.waitForFunction(id => !!window.town.runtime.snapshot().entities.find(e => e.id === id)?.components["Town/Upgraded"], entity.id)
+    await page.getByRole("button", { name: `开始建造${title}`, exact: true }).click()
+    await page.waitForFunction(id => !!window.town.runtime.snapshot().entities.find(e => e.id === id)?.components["Town/Works"], entity.id)
+    assert.equal((await snap()).entities.find(e => e.id === entity.id)?.components["Town/Upgraded"], undefined)
+    await page.evaluate(() => window.town.advance(240))
+    await page.waitForFunction(id => window.town.runtime.snapshot().entities.find(e => e.id === id)?.components["Town/Upgraded"]?.level === 1, entity.id)
     await page.waitForFunction(t => document.querySelector(".panel h2")?.textContent === t, title)
     const picture = page.locator(".panel header img")
     await picture.waitFor({ state: "visible" })

@@ -7,7 +7,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { amounts, FACE_TICKS, goodIds, kinds, ranks, ticks, YEARS_PER_TERM } from "../src/content.ts"
+import { amounts, FACE_TICKS, goodIds, kinds, ranks, stepsOf, YEARS_PER_TERM } from "../src/content.ts"
 import { canPlace, GridBuilder } from "../src/grid.ts"
 import { goalsOf, nextRank, scoreOf } from "../src/rules/goals.ts"
 import { headless, type Snapshot } from "../src/sim/headless.ts"
@@ -32,7 +32,7 @@ const market = (s: Snapshot) => {
       "Town/Building": { kind: "market" },
       "Town/Status": "idle",
       "Town/Staff": { needed: 0, assigned: 0, apprentices: 0, nearby: 0 },
-      "Town/Service": { service: "goods", interval: ticks(m.service!.seconds), cooldown: 0, range: m.service!.range },
+      "Town/Service": { service: "goods", interval: stepsOf(m.service!.seconds), cooldown: 0, range: m.service!.range },
       "Town/Inventory": { stock: amounts({}), accepts: ["fish", "smoked", "bread", "cloth"], cap: m.holds!.cap }
     }
   })
@@ -55,8 +55,16 @@ test("each rank asks more than the last, and the city asks for burghers", () => 
   assert.equal(residents(towns), 180)
   assert.equal(nextRank(ranks.length - 1), ranks.length - 1)
   assert.deepEqual(goalsOf(charter, town, undefined, 3), city)
+  // Each asks an income, not coins held; the city asks for a guildhall too, and a guildhall meets it.
+  const income = (goals: ReadonlyArray<{ id: string; target: number }>) => goals.find((g) => g.id === "income")!.target
+  assert.equal(income(towns), 100)
+  assert(income(village) < income(towns) && income(towns) < income(city))
+  assert.equal(towns.some((g) => g.id === "hall"), false)
+  assert.equal(city.find((g) => g.id === "hall")?.met, false)
+  assert.equal(goalsOf(charter, { ...town, hall: 1 }, undefined, 2).find((g) => g.id === "hall")?.met, true)
+  assert.equal(goalsOf(charter, { ...town, coins: 1_000_000 }, undefined, 1).find((g) => g.id === "income")?.met, false, "a hoard is not an income")
   // A rank counts for more than its people.
-  const s = { settlers: 100, citizens: 50, burghers: 10, coins: 2000, approval: 20, met: 2, missed: 0 }
+  const s = { settlers: 100, citizens: 50, burghers: 10, net: 150, approval: 20, met: 2, missed: 0 }
   assert(scoreOf(s, 2) > scoreOf(s, 1))
 })
 
@@ -74,7 +82,7 @@ test("a rock quarried down stays as a worked face, and gives one more now and th
   assert(after.every((e) => e.components["Town/Rock"].amount === 1))
 })
 
-test("a market is upgraded to a market hall once the town is a town, and not before", () => {
+test("a market is upgraded to a market hall once the town is a town, and not before: paid now, built as carriers bring its materials", () => {
   const toasts: Array<string> = []
   const t = headless(charter, { toast: (m) => toasts.push(m) })
   t.run(1)
@@ -86,22 +94,58 @@ test("a market is upgraded to a market hall once the town is a town, and not bef
   t.run(1)
   const hamlet = t.snapshot().entities.find((e) => e.components["Town/Building"]?.kind === "market")!
   assert.equal("Town/Upgraded" in hamlet.components, false)
+  assert.equal("Town/Works" in hamlet.components, false)
   assert(toasts.some((m) => m.includes("需要城镇等级达到城镇")), toasts.join(" | "))
 
   t.change((s) => {
     s.resources["Town/Fate"].rank = 2
   })
-  const stone = stockOf(t.snapshot(), "stone")
+  const up = kinds.market.upgrade!
+  const coins = t.snapshot().resources["Town/Treasury"].coins, stone = stockOf(t.snapshot(), "stone")
   t.edit({ type: "upgrade", cell })
   t.run(1)
+  const begun = t.snapshot(), works = begun.entities.find((e) => e.components["Town/Building"]?.kind === "market")!
+  // The coins go at once; the materials are owed and then worked in, and the market works on meanwhile.
+  assert(begun.resources["Town/Treasury"].coins <= coins - up.cost.coins)
+  assert("Town/Works" in works.components, toasts.join(" | "))
+  assert.equal(works.components["Town/Works"].total, Object.values(up.cost.materials).reduce((n, k) => n + k!, 0))
+  assert.equal("Town/Upgraded" in works.components, false)
+  assert.equal(works.components["Town/Service"].range, kinds.market.service!.range)
+  assert(begun.resources["Town/Chronicle"].lines.some((l: { text: string }) => l.text === "市场开始升级施工，完工后将成为市场大厅。"))
+  t.run(90)
   const s = t.snapshot()
   const hall = s.entities.find((e) => e.components["Town/Building"]?.kind === "market")!
-  const up = kinds.market.upgrade!
-  assert.equal("Town/Upgraded" in hall.components, true)
+  assert.equal("Town/Works" in hall.components, false, JSON.stringify(hall.components["Town/Works"]))
+  assert.deepEqual(hall.components["Town/Upgraded"], { level: 1 })
   assert.equal(hall.components["Town/Service"].range, up.service!.range)
-  assert.equal(hall.components["Town/Service"].interval, ticks(up.service!.seconds))
-  assert.equal(stockOf(s, "stone"), stone - up.cost.materials.stone!)
+  assert.equal(hall.components["Town/Service"].interval, stepsOf(up.service!.seconds))
+  assert(stockOf(s, "stone") <= stone - up.cost.materials.stone!)
   assert(s.resources["Town/Chronicle"].lines.some((l: { text: string }) => l.text === "市场已升级为市场大厅。"))
+})
+
+test("the town hall becomes a guildhall from its own stores, and the guildhall a city hall", () => {
+  const t = headless(charter)
+  t.run(1)
+  const hallOf = (s: Snapshot) => s.entities.find((e) => e.components["Town/TownHall"])!
+  let cell = { x: 0, y: 0 }
+  t.change((s) => {
+    s.resources["Town/Fate"].rank = 2
+    s.resources["Town/Treasury"].coins = 5000
+    const hall = hallOf(s)
+    cell = hall.components["Town/Tile"]
+    hall.components["Town/Inventory"].stock = { ...hall.components["Town/Inventory"].stock, planks: 90, stone: 140, tools: 30, cloth: 30 }
+  })
+  t.edit({ type: "upgrade", cell })
+  t.run(150)
+  const guild = hallOf(t.snapshot())
+  assert.deepEqual(guild.components["Town/Upgraded"], { level: 1 }, JSON.stringify(guild.components["Town/Works"]))
+  assert.equal(guild.components["Town/Inventory"].cap, kinds.townhall.upgrade!.cap)
+  assert.equal(guild.components["Town/Carriers"].count, kinds.townhall.upgrade!.carriers)
+  t.edit({ type: "upgrade", cell })
+  t.run(300)
+  const city = hallOf(t.snapshot())
+  assert.deepEqual(city.components["Town/Upgraded"], { level: 2 }, JSON.stringify(city.components["Town/Works"]))
+  assert.equal(city.components["Town/Inventory"].cap, kinds.townhall.upgrade!.next!.cap)
 })
 
 test("once a term runs out, the next one carries on the same town", () => {
@@ -146,7 +190,7 @@ test("a long reign: five terms follow one another, each judged on its own, and t
       const samples = s.resources["Town/History"].samples
       for (let i = 1; i <= 400; i++) samples.push({ ...sample, tick: f.began + Math.round((i * term) / 401) })
       s.resources["Town/Crown"] = { ...s.resources["Town/Crown"], met: 3, missed: 2, streak: 2 }
-      s.resources["Town/Time"].tick = s.resources["Town/Charter"].founded + f.began + term - 120
+      s.resources["Town/Time"].step = s.resources["Town/Charter"].founded + f.began + term - 120
       s.resources["Town/Treasury"].coins = 5000
     })
     t.run(3)
@@ -201,7 +245,8 @@ test("pulling down a market hall gives back part of the upgrade too", () => {
     s.resources["Town/Fate"].rank = 2
   })
   t.edit({ type: "upgrade", cell })
-  t.run(1)
+  t.run(90)
+  assert.deepEqual(t.snapshot().entities.find((e) => e.components["Town/Building"]?.kind === "market")!.components["Town/Upgraded"], { level: 1 })
   const stone = stockOf(t.snapshot(), "stone")
   t.edit({ type: "remove", cell })
   t.run(1)
@@ -209,4 +254,44 @@ test("pulling down a market hall gives back part of the upgrade too", () => {
   const base = kinds.market.cost.materials.stone!, up = kinds.market.upgrade!.cost.materials.stone!
   assert(back > Math.floor(base / 2), `${back} stone back, more than the market's own share`)
   assert(back <= base + up)
+})
+
+test("pulling down a building with works under way gives back the works' coins and what was brought, as a cancelled site does", () => {
+  const t = headless(charter)
+  t.run(1)
+  let cell = { x: 0, y: 0 }
+  t.change((s) => {
+    cell = market(s)
+    s.resources["Town/Fate"].rank = 2
+  })
+  t.edit({ type: "upgrade", cell })
+  t.run(1)
+  const begun = t.snapshot(), works = begun.entities.find((e) => e.components["Town/Building"]?.kind === "market")!.components["Town/Works"]
+  assert(works, "the works began")
+  const coins = begun.resources["Town/Treasury"].coins, stone = stockOf(begun, "stone")
+  const up = kinds.market.upgrade!
+  const brought = up.cost.materials.stone! - works.owed.stone
+  t.edit({ type: "remove", cell })
+  t.run(1)
+  const after = t.snapshot()
+  assert.equal(after.entities.some((e) => e.components["Town/Building"]?.kind === "market"), false)
+  // The market's own fee is a small share of its coins: the works' coins come back whole on top.
+  assert(after.resources["Town/Treasury"].coins >= coins + up.cost.coins - kinds.market.cost.coins, `${after.resources["Town/Treasury"].coins} from ${coins}`)
+  assert(stockOf(after, "stone") >= stone + brought)
+})
+
+test("two clicks to upgrade the same building in one step begin one works, and pay once", () => {
+  const t = headless(charter)
+  t.run(1)
+  let cell = { x: 0, y: 0 }
+  t.change((s) => {
+    cell = market(s)
+    s.resources["Town/Fate"].rank = 2
+    s.resources["Town/Treasury"].coins = 2000
+  })
+  t.edit({ type: "upgrade", cell }, { type: "upgrade", cell })
+  t.run(1)
+  const s = t.snapshot()
+  assert("Town/Works" in s.entities.find((e) => e.components["Town/Building"]?.kind === "market")!.components)
+  assert(s.resources["Town/Treasury"].coins > 2000 - 2 * kinds.market.upgrade!.cost.coins, String(s.resources["Town/Treasury"].coins))
 })

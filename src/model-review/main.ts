@@ -4,8 +4,12 @@ import { buildAsset, exportAsset } from "../asset-lab/renderer.ts"
 import { kindIds } from "../content.ts"
 import { ruralIds } from "../asset-lab/rural.ts"
 import "./style.css"
+import "./handoff.css"
 
 const families = {
+  milestones: { title: "市政建筑阶段", ids: ["townhall", "guildhall", "cityhall"] },
+  works: { title: "共用施工模型", ids: ["upgrade-works-15", "upgrade-works-50", "upgrade-works-90", "works-carpenter-0", "works-warehouse-0", "works-quarry-0", "works-farm-0", "works-townhall-1", "works-townhall-2"] },
+  handoff: { title: "PR #20 · 新模型", ids: ["carpenter", "guildhall", "cityhall", "depot", "ovenworks", "masonry", "estate", "fire-brigade", "market-hall", "church", "upgrade-works-15", "upgrade-works-50", "upgrade-works-90", "cart-furniture-4"] },
   town: { title: "全部建筑", ids: [...kindIds, "market-hall", "church"] },
   rural: { title: "细节修订", ids: ruralIds },
   trades: { title: "贸易与生产建筑", ids: ["mill", "warehouse", "fishery", "bakery", "weaver", "watchhouse"] },
@@ -16,12 +20,15 @@ const families = {
   homes: { title: "住宅与街区", ids: ["cottage", "citizen", "townhouse", "cottage-fine", "citizen-fine", "townhouse-fine", "cottage-poor", "citizen-worn", "townhouse-worn"] },
   winter: { title: "冬季", ids: ["cottage-winter", "citizen-winter", "townhouse-winter", "granary-winter", "smokehouse-winter", "firewatch-winter", "healer-winter", "hospital-winter", "watchhouse-winter", "builder-winter"] },
   hazards: { title: "废墟", ids: ["ruin-burnt-1", "ruin-collapsed-1", "ruin-derelict-1"] },
-  people: { title: "人物与货物", ids: ["service-watchman", "service-firefighter", "service-physician", "service-constable", "service-builder", "goods-smoked", "cart-smoked-4", "barrow-smoked-4"] },
+  people: { title: "人物与货物", ids: ["service-watchman", "service-firefighter", "service-physician", "service-constable", "service-builder", "goods-smoked", "cart-smoked-4", "barrow-smoked-4", "goods-furniture", "cart-furniture-4", "barrow-furniture-4"] },
   wear: { title: "建筑状况", ids: ["granary-worn", "smokehouse-worn", "firewatch-worn", "healer-worn", "hospital-worn", "watchhouse-worn", "builder-worn"] },
   upgrades: { title: "建筑升级与采空矿面", ids: ["market", "market-hall", "chapel", "church", "stone-full", "stone-quarried", "stone-worked", "ore-full", "ore-quarried", "ore-worked"] }
 } as const
 type Family = keyof typeof families
 const introductions: Partial<Record<Family, { heading: string; eyebrow: string; description: string; aside: string }>> = {
+  milestones: { heading: "小镇成长，<br>步步成形。", eyebrow: "市政厅 · 行会大厅 · 城市政厅", description: "熟悉的市政厅先变成带钟楼和阳台的陡顶行会大厅，再变成配有礼仪台阶、柱廊与低矮侧翼的穹顶城市政厅。三个视图使用相同镜头比例。", aside: "3 个市政建筑阶段<br>保留原有 3×3 格占地<br><span>各具轮廓、<br>石作与市政配色。</span>" },
+  works: { heading: "一套脚手架，<br>适配各类建筑。", eyebrow: "共用施工几何模型", description: "市政建筑、开放工坊、仓库、采石场与农场使用相同的模块化脚手架，仅根据占地、建筑高度和建材送达比例生成；每一侧中央均保留通道。", aside: "1 套共用绘制函数<br>6 种建筑形态<br><span>工作平台、通行梯、<br>帆布围挡与建材。</span>" },
+  handoff: { heading: "新的建筑，<br>熟悉的墨线。", eyebrow: "PR #20 · 木工坊与建筑升级", description: "开放木工坊、市政高塔，以及各类工作院落的扩建。旋转模型查看工具和支撑结构，再与已有建筑合集对比。", aside: "1 种新工坊<br>9 款升级外观<br><span>另有脚手架进度<br>与家具运输模型。</span>" },
   town: { heading: "整座小镇，<br>同样的墨线。", eyebrow: "完整建筑集合", description: "包含全部建筑，以及市场大厅和大教堂。对比轮廓、旋转整组模型，或打开单栋建筑查看细节。", aside: `${kindIds.length} 种建筑<br>2 款升级模型<br><span>工作院落、生产作坊、<br>仓储与公共服务。</span>` },
   rural: { heading: "细微之处，<br>小镇更生动。", eyebrow: "建筑细节修订", description: "木制入口、苗床、农场细节、简洁的教堂与连通的消防站瞭望台，一起查看九款修订模型。", aside: "9 款修订建筑<br>保留原有占地<br><span>连通的结构、<br>清晰的入口与实用院落。</span>" },
   workshops: { heading: "留出工作空间，<br>延续墨线风格。", eyebrow: "第一组建筑", description: "围绕工具布置的开放院落，以及市政厅的公共入口。旋转模型查看工作空间。", aside: "4 款修订建筑<br>3 处开放院落<br><span>保留原有占地，以浅色表面、<br>细墨线和工作器具呈现。</span>" },
@@ -31,7 +38,7 @@ const root = document.querySelector<HTMLElement>("#review")!
 root.innerHTML = `<header><a href="/">墨线小镇</a><span>城镇模型预览</span><a href="/map-lab.html">城镇地图 ↗</a></header>
   <section class="intro"><div><p class="eyebrow">让城镇更有生机</p><h1>新的街景。<br>熟悉的墨线。</h1><p>成组查看模型并旋转视角，也可打开单个模型查看细节。</p></div><aside>7 种建筑<br>3 种公园设施<br>3 个住宅等级<br><span>还有人物、灾害、石铺道路、<br>积雪与磨损效果。</span></aside></section>
   <nav aria-label="模型合集"></nav><section class="camera"><label>旋转模型 <input aria-label="模型旋转" type="range" min="-180" max="180" value="0"><output>0°</output></label><button id="rear">查看背面</button><button id="reset">重置视角</button><button id="sheet">保存模型总览图</button><a id="sheet-link" hidden download>下载总览图 ↗</a><label>视角 <select aria-label="视角仰角"><option value="30">街道视角</option><option value="50">俯视</option><option value="15">近地视角</option></select></label></section>
-  <section class="grid" aria-label="3D 模型"></section><footer><a href="/park-lab.html">公园布局与流水 ↗</a> · <a href="/effects-lab.html">住宅动态特效 ↗</a> · 拖动模型旋转整组视角 · <a href="/asset-lab.html">完整模型图鉴 ↗</a> · <a href="/">进入游戏 ↗</a></footer>`
+  <section class="grid" aria-label="3D 模型"></section><footer><a href="/proportion-review.html">比例修改前后对比 ↗</a> · <a href="/park-lab.html">公园布局与流水 ↗</a> · <a href="/effects-lab.html">住宅动态特效 ↗</a> · 拖动模型旋转整组视角 · <a href="/asset-lab.html">完整模型图鉴 ↗</a> · <a href="/">进入游戏 ↗</a></footer>`
 const nav = root.querySelector("nav")!, grid = root.querySelector<HTMLElement>(".grid")!, rotation = root.querySelector<HTMLInputElement>("input")!, elevation = root.querySelector<HTMLSelectElement>("select")!
 const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true })
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.outputColorSpace = THREE.SRGBColorSpace
@@ -71,6 +78,7 @@ function select(next: Family) {
   if (sheetUrl) URL.revokeObjectURL(sheetUrl)
   sheetUrl = ""; root.querySelector<HTMLAnchorElement>("#sheet-link")!.hidden = true
   family = next; models.forEach(m => m.built.dispose()); models = []; grid.replaceChildren()
+  grid.classList.toggle("handoff", family === "handoff")
   const intro = introductions[family] ?? { heading: "新的街景。<br>熟悉的墨线。", eyebrow: "让城镇更有生机", description: "成组查看模型并旋转视角，也可打开单个模型查看细节。", aside: "7 种建筑<br>3 种公园设施<br>3 个住宅等级<br><span>还有人物、灾害、石铺道路、<br>积雪与老化痕迹。</span>" }
   root.querySelector(".intro h1")!.innerHTML = intro.heading
   root.querySelector(".eyebrow")!.textContent = intro.eyebrow
@@ -91,6 +99,11 @@ function select(next: Family) {
       a.href = url; a.download = `inkline-${id}.glb`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000)
     }
   }
+  if (family === "milestones") {
+    const bounds = new THREE.Box3()
+    for (const model of models) bounds.union(new THREE.Box3().setFromObject(model.built.group))
+    for (const model of models) { bounds.getCenter(model.center); bounds.getSize(model.size) }
+  }
   nav.querySelectorAll("button").forEach(b => { b.setAttribute("aria-pressed", String(b.dataset.family === next)) })
   history.replaceState(null, "", `?collection=${next}`); render()
 }
@@ -102,7 +115,7 @@ elevation.onchange = () => { pitch = Number(elevation.value); render() }
 root.querySelector<HTMLButtonElement>("#rear")!.onclick = () => { yaw = yaw === 180 ? 0 : 180; render() }
 root.querySelector<HTMLButtonElement>("#reset")!.onclick = () => { yaw = 0; pitch = 30; elevation.value = "30"; render() }
 root.querySelector<HTMLButtonElement>("#sheet")!.onclick = () => {
-  const canvas = document.createElement("canvas"), ctx = canvas.getContext("2d")!, columns = 3, width = 400, height = 350
+  const canvas = document.createElement("canvas"), ctx = canvas.getContext("2d")!, columns = family === "handoff" ? 2 : 3, width = family === "handoff" ? 600 : 400, height = 350
   canvas.width = columns * width; canvas.height = 100 + Math.ceil(models.length / columns) * height
   ctx.fillStyle = "#f0f2ec"; ctx.fillRect(0, 0, canvas.width, canvas.height)
   ctx.fillStyle = "#3d4943"; ctx.font = "30px Georgia"; ctx.fillText(`墨线小镇 / ${families[family].title}`, 30, 48)

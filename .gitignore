@@ -1,4 +1,5 @@
 node_modules
+.repos/
 dist
 .alchemy
 .env
@@ -8,3 +9,8 @@ output/inkline-3d/
 output/balance-model/
 output/balance-rules/
 output/mobile-review/
+output/upgrades/
+output/look-ui/
+output/look-readme/
+# Replays saved during dev play (see PLAYTEST.md): debug artifacts, never committed.
+.replays/

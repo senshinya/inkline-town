@@ -5,9 +5,9 @@ import { shippedRules } from "../rules/config.ts"
  * town's approval follows how it is treated, the town's history is kept,
  * the town rises through its ranks, and the term ends: lost, or run out.
  */
-import { crown, HISTORY_TICKS, ticks, WINTER_WARNING, type GoodId } from "../content.ts"
-import * as Random from "@typeonce/bevy-ts-math/Random"
-import { Building, Census, Charter, Chronicle, Crown, Fate, Game, Rules, History, House, Inventory, Ledger, Mood, Pantry, Paused, Policy, Recipe, Rising, Rng, Site, Stock, Storage, Time, Treasury } from "../schema.ts"
+import { crown, HISTORY_TICKS, stepsOf, WINTER_WARNING, type GoodId } from "../content.ts"
+import * as Random from "@typeonce/ritmo-math/Random"
+import { Building, Census, Charter, Chronicle, Crown, Fate, Game, Rules, History, House, Inventory, Ledger, Mood, Pantry, Paused, Policy, Recipe, Rising, Rng, Site, Stock, Storage, Time, Treasury, TownHall, Upgraded } from "../schema.ts"
 import { elapsed, seasonAt, termTicks, write } from "./shared.ts"
 
 // ── Time ──────────────────────────────────────────────────────────────────
@@ -98,7 +98,7 @@ export const Requests = Game.System(
     const charter = resources.charter.get()
     const t = elapsed(resources.time.get(), charter)
     const c = resources.crown.get()
-    const remembered = c.snubs.filter((at) => t - at < ticks(crown.memory * 60))
+    const remembered = c.snubs.filter((at) => t - at < stepsOf(crown.memory * 60))
     if (remembered.length !== c.snubs.length) resources.crown.set({ ...c, snubs: remembered })
 
     if (c.open && t >= c.due) {
@@ -120,9 +120,7 @@ export const Requests = Game.System(
     // Only what keeps: fish and bread would rot on the way.
     const options = [...rates.keys()].filter((g) => spoils[g] === undefined).sort()
     if (options.length === 0) return
-    const random = Random.make(resources.rng.get())
-    const good = random.pick(options)!
-    resources.rng.set(random.state)
+    const good = Random.draw(resources.rng).pick(options)!
     // Larger the later in this term it is: a new term starts the crown small again.
     const progress = Math.min(1, Math.max(0, t - resources.fate.get().began) / termTicks(charter, rules))
     const window = (crownGap(charter, rules) * crown.window) / 3600
@@ -163,7 +161,7 @@ export const Approve = Game.System(
     const rules = services.rules
 
     const t = elapsed(resources.time.get(), resources.charter.get())
-    if (t % ticks(10) !== 0) return
+    if (t % stepsOf(10) !== 0) return
     const policy = resources.policy.get()
     const m = resources.mood.get()
     const parts = approvalTarget(queries.homes.each().map(({ data }) => data.house.get()), policy,
@@ -205,6 +203,7 @@ export { goalsOf, larder, nextRank, scoreOf, steadyNet } from "../rules/goals.ts
 export const Judge = Game.System(
   "Town/Judge",
   {
+    queries: { halls: Game.Query({ selection: { upgraded: Game.Query.optional(Upgraded) }, with: [TownHall] }) },
     resources: {
       time: Game.System.readResource(Time),
       charter: Game.System.readResource(Charter),
@@ -219,9 +218,12 @@ export const Judge = Game.System(
     },
     services: { rules: Game.System.service(Rules) }
   },
-  ({ resources, services }) => {
+  ({ queries, resources, services }) => {
     const rules = services.rules
     const { crown, fate, ranks } = rules
+    // The town hall's upgrades: a city asks for a guildhall.
+    const hallRow = queries.halls.each()[0]
+    const hall = hallRow ? hallRow.data.upgraded.value()?.level ?? 0 : 0
 
     const charter = resources.charter.get()
     const t = elapsed(resources.time.get(), charter)
@@ -236,7 +238,7 @@ export const Judge = Game.System(
     const residents = census.settlers + census.citizens
     const net = steadyNet(resources.history.get().samples, ledger.taxes + ledger.trade - ledger.upkeep - ledger.admin)
     const note = (text: string, alarm = false) => write(resources.chronicle, t, text, alarm)
-    const minutes = (n: number) => ticks(n * 60)
+    const minutes = (n: number) => stepsOf(n * 60)
 
     const next = { ...f, peak: Math.max(f.peak, residents) }
     for (const mark of [50, 100, 250, 500, 1000]) if (f.peak < mark && residents >= mark) note(`${mark} residents.`)
@@ -253,7 +255,7 @@ export const Judge = Game.System(
 
     const end = (state: "lost" | "over", reason: string) => {
       note(reason)
-      resources.fate.set({ ...next, state, reason, at: t, score: scoreOf({ ...census, coins, approval, met: crownNow.met, missed: crownNow.missed }, next.rank) })
+      resources.fate.set({ ...next, state, reason, at: t, score: scoreOf({ ...census, net, approval, met: crownNow.met, missed: crownNow.missed, hall }, next.rank) })
     }
     if (next.debtSince >= 0 && t - next.debtSince >= minutes(fate.debt)) return end("lost", "破产：王室收回了市长的财政管理权。")
     if (next.revoltSince >= 0 && t - next.revoltSince >= minutes(fate.revolt)) return end("lost", "叛乱：居民赶走了市长。")
@@ -265,7 +267,7 @@ export const Judge = Game.System(
 
     // The next rank.
     if (nextRank(f.rank, rules) > f.rank) {
-      const goals = goalsOf(charter, { ...census, coins, net, approval }, rules, f.rank)
+      const goals = goalsOf(charter, { ...census, coins, net, approval, hall }, rules, f.rank)
       if (goals.every((g) => g.met)) {
         const to = ranks[f.rank + 1]!
         if (f.goalSince < 0) note(`${to.title}的全部目标已达成，保持达标即可晋级。`)

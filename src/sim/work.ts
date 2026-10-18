@@ -1,3 +1,4 @@
+import { every } from "../content.ts"
 import { wildTreeSpots, canSeedTree } from "../rules/land.ts"
 /**
  * Building and working: the grid and the town's stock are indexed, sites
@@ -5,10 +6,10 @@ import { wildTreeSpots, canSeedTree } from "../rules/land.ts"
  * turn inputs (or the land) into goods, planters sow trees and fields, and
  * what is sown grows.
  */
-import * as Random from "@typeonce/bevy-ts-math/Random"
+import * as Random from "@typeonce/ritmo-math/Random"
 
 import { fieldDraft, treeDraft } from "../archetypes.ts"
-import { amounts, crewOf, goodIds, ticks, total, type Amounts, type Crew } from "../content.ts"
+import { amounts, anA, asUpgraded, crewOf, goodIds, stepsOf, total, upgradeAt, worksNeeded, type Amounts, type Crew } from "../content.ts"
 
 /** The flow of goods is counted in slices this many seconds long, and the last `FLOW_SLICES` of them (a minute) are kept. */
 const FLOW_SLICE = 10
@@ -16,7 +17,7 @@ const FLOW_SLICES = 6
 
 const each = (f: (g: (typeof goodIds)[number]) => number): Amounts => Object.fromEntries(goodIds.map((g) => [g, f(g)])) as Amounts
 import { around, doors, GridBuilder, key, ownerAt, reach, roadPrint, useAt } from "../grid.ts"
-import { Building, Burning, Charter, Chronicle, Errand, Flow, Roam, Condition, Field, FieldOf, Game, Rules, Gatherer, Grid, House, Inventory, Land, Paused, Paved, Planter, Recipe, Rising, Rng, Rock, Site, Staff, Status, Stock, Storage, Tile, Time, Treasury, Tree, maybe, type Status as StatusValue } from "../schema.ts"
+import { Building, Burning, Carriers, Charter, Chronicle, Errand, Flow, Roam, Condition, Field, FieldOf, Game, Rules, Gatherer, Grid, House, Inventory, Land, Paused, Paved, Planter, Recipe, Rising, Rng, Rock, Service, Site, Staff, Status, Stock, Storage, Tile, Time, Treasury, Tree, Upgraded, type Status as StatusValue, Water, Works } from "../schema.ts"
 import { connected, elapsed, seasonAt, TileRead, useOf, write } from "./shared.ts"
 
 import { assignWorkers, equipmentPace, effort, paced } from "../rules/production.ts"
@@ -33,16 +34,15 @@ export const IndexGrid = Game.System(
   {
     queries: {
       tiles: TileRead,
-      laid: Game.Query({ selection: { tile: Game.Query.read(Tile) }, filters: [Game.Query.added(Tile)] }),
-      /** A road just paved: the grid's paved cells change without any tile coming or going. */
-      paved: Game.Query({ selection: { paved: Game.Query.read(Paved) }, filters: [Game.Query.added(Paved)] })
+      /** A tile laid, or a road just paved: the grid's paved cells change without any tile coming or going. */
+      laid: Game.Query({ selection: {}, filters: [Game.Query.anyOf(Game.Query.added(Tile), Game.Query.added(Paved))] })
     },
     despawned: { entities: Game.System.readDespawned() },
     resources: { land: Game.System.readResource(Land), grid: Game.System.writeResource(Grid) }
   },
   ({ queries, despawned, resources }) => {
     const known = resources.grid.get().tiles
-    const changed = known === undefined || queries.laid.each().length > 0 || queries.paved.each().length > 0 || despawned.entities.all().some((id) => known.has(id))
+    const changed = known === undefined || queries.laid.each().length > 0 || despawned.entities.all().some((id) => known.has(id))
     if (!changed) return
     const grid = new GridBuilder(resources.land.get().mask)
     const tiles = new Set<number>()
@@ -100,7 +100,7 @@ export const CountStock = Game.System(
       const e = data.errand.get()
       held[e.good] = held[e.good]! + e.count
     }
-    const tick = resources.time.get().tick
+    const tick = resources.time.get().step
     const charter = resources.charter.get()
     const town = `${charter.seed}:${charter.founded}`
     const f = resources.flow.get()
@@ -115,7 +115,7 @@ export const CountStock = Game.System(
     // Coins that came in other than by the collection (a reward, a refund) were made; any that went out are left over as used.
     const other = treasury - f.coins.seen - f.coins.booked
     const coins = { ...f.coins, made: f.coins.made + Math.max(0, other), seen: treasury, booked: 0 }
-    if (tick - f.since < ticks(FLOW_SLICE)) {
+    if (tick - f.since < stepsOf(FLOW_SLICE)) {
       resources.flow.set({ ...f, held: now, coins })
       return
     }
@@ -144,6 +144,9 @@ export const CountStock = Game.System(
 
 // ── Going up ──────────────────────────────────────────────────────────────
 
+/** How often a storage under works takes a crate for it from its own shelves. */
+const SELF_SUPPLY_TICKS = stepsOf(1)
+
 /** Where a site's walls are once its materials are in: it goes on rising from here. */
 export const SITE_SHARE = 0.35
 
@@ -152,25 +155,80 @@ export const Raise = Game.System(
   {
     queries: {
       sites: Game.Query({ selection: { site: Game.Query.read(Site) } }),
-      rising: Game.Query({ selection: { rising: Game.Query.write(Rising), status: Game.Query.optional(Status) } })
+      rising: Game.Query({ selection: { rising: Game.Query.write(Rising), status: Game.Query.optional(Status) } }),
+      works: Game.Query({
+        selection: {
+          works: Game.Query.write(Works),
+          building: Game.Query.read(Building),
+          staff: Game.Query.write(Staff),
+          recipe: Game.Query.optional(Recipe),
+          carriers: Game.Query.optional(Carriers),
+          service: Game.Query.optional(Service)
+        }
+      }),
+      /** A storage under works (the town hall, a warehouse): its own shelves. */
+      stocked: Game.Query({ selection: { inventory: Game.Query.write(Inventory) }, with: [Storage, Works] })
     },
-    services: { rules: Game.System.service(Rules) }
+    resources: {
+      time: Game.System.readResource(Time),
+      charter: Game.System.readResource(Charter),
+      chronicle: Game.System.writeResource(Chronicle)
+    },
+    services: { rules: Game.System.service(Rules) },
+    commands: Game.System.commands(Game.System.removes(Works, Site, Rising), Game.System.inserts(Upgraded, Recipe, Carriers, Service, Rising, Status))
   },
-  ({ queries, commands, services }) => {
+  ({ queries, resources, commands, services }) => {
     const rules = services.rules
     const { buildTicks: BUILD_TICKS } = rules
 
+    // An upgrade whose materials are all in stands upgraded: it works from here on as `asUpgraded` says,
+    // keeping what it holds and what it was in the middle of.
+    const tick = resources.time.get().step
+    for (const { entity, data } of queries.works.each()) {
+      let works = data.works.get()
+      // A storage under works (the town hall) builds with what it holds itself, a crate at a time.
+      const shelves = queries.stocked.get(entity.id)
+      if (shelves.ok && tick % SELF_SUPPLY_TICKS === 0) {
+        const own = shelves.value.data.inventory.get()
+        const g = goodIds.find((g) => works.owed[g] > 0 && own.stock[g] > 0)
+        if (g) {
+          const n = Math.min(rules.transport.load, works.owed[g], own.stock[g])
+          shelves.value.data.inventory.set({ ...own, stock: { ...own.stock, [g]: own.stock[g] - n } })
+          works = { ...works, owed: { ...works.owed, [g]: works.owed[g] - n } }
+          data.works.set(works)
+        }
+      }
+      // Builders work on as the materials come in, never ahead of them.
+      const needed = worksNeeded(works.total, rules), allowed = needed * (1 - total(works.owed) / Math.max(1, works.total))
+      if (works.done < allowed) {
+        works = { ...works, done: works.done + 1 }
+        data.works.set(works)
+      }
+      if (total(works.owed) > 0 || works.done < needed) continue
+      const base = rules.kinds[data.building.get().kind], kind = asUpgraded(base, works.level)
+      commands.remove(entity, Works)
+      commands.insert(entity, Game.Command.entry(Upgraded, { level: works.level }))
+      data.staff.set({ ...data.staff.get(), needed: kind.workers })
+      const recipe = data.recipe.value(), carriers = data.carriers.value(), service = data.service.value()
+      if (recipe && kind.recipe) commands.insert(entity, Game.Command.entry(Recipe, { ...recipe, period: stepsOf(kind.recipe.seconds) }))
+      if (shelves.ok && kind.holds) shelves.value.data.inventory.set({ ...shelves.value.data.inventory.get(), cap: kind.holds.cap })
+      if (carriers && kind.carriers) commands.insert(entity, Game.Command.entry(Carriers, { count: kind.carriers }))
+      if (service && kind.service) commands.insert(entity, Game.Command.entry(Service, { ...service, interval: stepsOf(kind.service.seconds), range: kind.service.range }))
+      const was = (upgradeAt(base, works.level - 1)?.title ?? base.title).toLowerCase()
+      write(resources.chronicle, elapsed(resources.time.get(), resources.charter.get()), `${was}已升级为${anA(upgradeAt(base, works.level)!.title.toLowerCase())}。`, true)
+    }
+
     for (const { entity, data } of queries.sites.each()) {
       if (total(data.site.get().owed) > 0) continue
-      commands.remove(entity.id, Site)
-      commands.insert(entity.id, Game.Command.entry(Rising, { ticks: Math.round(BUILD_TICKS * SITE_SHARE) }))
+      commands.remove(entity, Site)
+      commands.insert(entity, Game.Command.entry(Rising, { ticks: Math.round(BUILD_TICKS * SITE_SHARE) }))
     }
     for (const { entity, data } of queries.rising.each()) {
       const ticks = data.rising.get().ticks + 1
       if (ticks >= BUILD_TICKS) {
-        commands.remove(entity.id, Rising)
+        commands.remove(entity, Rising)
         // Up and standing; its work (if it has any) says otherwise from here on.
-        if (data.status.present) commands.insert(entity.id, Game.Command.entry(Status, "idle"))
+        if (data.status.present) commands.insert(entity, Game.Command.entry(Status, "idle"))
       } else data.rising.set({ ticks })
     }
   }
@@ -179,7 +237,7 @@ export const Raise = Game.System(
 // ── Workers ───────────────────────────────────────────────────────────────
 
 /** Workers are reassigned this often: residents move in and out every few seconds, no faster. */
-export const STAFF_TICKS = ticks(0.5)
+export const STAFF_TICKS = stepsOf(0.5)
 
 /**
  * Residents go to work at the workplaces within a commute of their home
@@ -214,7 +272,7 @@ export const AssignStaff = Game.System(
     const rules = services.rules
     const { kinds, commute: COMMUTE, staffTicks: STAFF_TICKS } = rules
 
-    if (resources.time.get().tick % STAFF_TICKS !== 0) return
+    if (!every(resources.time.get(), STAFF_TICKS)) return
     const grid = resources.grid.get()
     const homes: Array<{ readonly id: number; readonly crew: Crew; left: number; readonly doors: ReadonlyArray<{ readonly x: number; readonly y: number }> }> = []
     for (const { entity, data } of queries.homes.each()) {
@@ -272,8 +330,9 @@ export const AssignStaff = Game.System(
  * One step of every recipe. A job starts when there is room for what it
  * makes, its input is in, and (for a gatherer) the land has what it needs
  * within reach: a grown tree is felled, a rock chipped, a ripe field
- * reaped. Then the crew puts its worker-steps in; a full crew finishes in
- * `period` steps. It goes at half pace without the tools it wears out, and
+ * reaped, a rested cell of water fished. Then the crew puts its
+ * worker-steps in; a full crew finishes in `period` steps. It goes at half
+ * pace without the tools it wears out, and
  * at half pace again once it is run down; in winter, fishing goes at the
  * winter's pace (a hard winter's is a quarter).
  */
@@ -291,13 +350,15 @@ export const Work = Game.System(
           status: Game.Query.write(Status),
           gatherer: Game.Query.optional(Gatherer),
           paused: Game.Query.optional(Paused),
-          condition: Game.Query.optional(Condition)
+          condition: Game.Query.optional(Condition),
+          upgraded: Game.Query.optional(Upgraded)
         },
         without: [Site, Rising]
       }),
       trees: Game.Query({ selection: { tree: Game.Query.read(Tree) } }),
       rocks: Game.Query({ selection: { rock: Game.Query.write(Rock) } }),
-      fields: Game.Query({ selection: { field: Game.Query.write(Field) } })
+      fields: Game.Query({ selection: { field: Game.Query.write(Field) } }),
+      waters: Game.Query({ selection: { water: Game.Query.write(Water) } })
     },
     resources: {
       grid: Game.System.readResource(Grid),
@@ -306,7 +367,8 @@ export const Work = Game.System(
       flow: Game.System.writeResource(Flow),
       chronicle: Game.System.writeResource(Chronicle)
     },
-    services: { rules: Game.System.service(Rules) }
+    services: { rules: Game.System.service(Rules) },
+    commands: Game.System.commands(Game.System.despawns(Tree))
   },
   ({ queries, resources, commands, services }) => {
     const rules = services.rules
@@ -314,7 +376,7 @@ export const Work = Game.System(
     const made: Record<string, number> = {}
 
     const grid = resources.grid.get()
-    const tick = resources.time.get().tick
+    const tick = resources.time.get().step
     const t = elapsed(resources.time.get(), resources.charter.get())
     const season = seasonAt(t, resources.charter.get(), rules)
     const fishing = season.severity ? winters[season.severity].fishing : 1
@@ -326,6 +388,7 @@ export const Work = Game.System(
     const trees = lazy(() => new Map(queries.trees.each().map((row) => [row.entity.id as number, row])))
     const rocks = lazy(() => new Map(queries.rocks.each().map((row) => [row.entity.id as number, row])))
     const fields = lazy(() => new Map(queries.fields.each().map((row) => [row.entity.id as number, row])))
+    const waters = lazy(() => new Map(queries.waters.each().map((row) => [row.entity.id as number, row])))
     const used = new Set<number>()
     // A worked face gives one more now and then.
     if (tick % rules.faceTicks === 0)
@@ -335,16 +398,23 @@ export const Work = Game.System(
       }
 
     /** Takes what a gatherer needs from the land within reach, or says there is none. */
-    const gather = (source: "tree" | "stone" | "ore" | "field" | "water", tile: { x: number; y: number; size: number }, radius: number): boolean => {
+    const gather = (source: "tree" | "stone" | "ore" | "field" | "water", tile: { x: number; y: number; size: number }, radius: number, deep = false): boolean => {
       for (const c of around(tile, radius)) {
         const use = useAt(grid, c.x, c.y)
         const id = ownerAt(grid, c.x, c.y)
         if (used.has(id)) continue
-        if (source === "water" && use === "water") return true
+        if (source === "water" && use === "water") {
+          // A cell fished rests a while before it gives another catch.
+          const water = waters().get(id)
+          if (!water || tick - water.data.water.get().fished < rules.restockTicks) continue
+          water.data.water.set({ fished: tick })
+          used.add(id)
+          return true
+        }
         if (source === "tree" && use === "tree") {
           const tree = trees().get(id)
           if (!tree || tree.data.tree.get().growth < GROWN.tree) continue
-          commands.despawn(tree.entity.id)
+          commands.despawn(tree.entity)
           used.add(id)
           return true
         }
@@ -352,7 +422,13 @@ export const Work = Game.System(
           const rock = rocks().get(id)
           if (!rock) continue
           const r = rock.data.rock.get()
-          if (r.ore !== (source === "ore") || r.amount <= 0) continue
+          if (r.ore !== (source === "ore")) continue
+          // A masonry cuts a worked face at full pace (see `Upgrade.deep`); anyone else waits for it.
+          if (r.amount <= 0) {
+            if (!deep) continue
+            used.add(id)
+            return true
+          }
           // Quarried down, a rock stays as a worked face (see `FACE_TICKS`).
           rock.data.rock.set({ ...r, amount: r.amount - 1 })
           if (r.amount === 2 && ![...rocks().values()].some((o) => o !== rock && o.data.rock.get().ore === r.ore && o.data.rock.get().amount >= 2))
@@ -360,8 +436,8 @@ export const Work = Game.System(
               resources.chronicle,
               t,
               r.ore
-                ? "The last of the open ore is dug: the worked faces still give a little, slowly. Traders sell ore and tools."
-                : "The last of the open stone is quarried: the worked faces still give a little, slowly. Traders sell stone.",
+                ? "最后一处露天矿石已采尽，采空矿面仍会缓慢产出少量矿石。也可向商人购买矿石和工具。"
+                : "最后一处露天石料已采尽，采空矿面仍会缓慢产出少量石料。也可向商人购买石料。",
               true,
               c
             )
@@ -382,7 +458,7 @@ export const Work = Game.System(
       const tile = data.tile.get()
       const kind = kinds[data.building.get().kind]
       const staff = data.staff.get()
-      const gatherer = maybe(data.gatherer)
+      const gatherer = data.gatherer.value()
       let recipe = data.recipe.get()
       const inventory = data.inventory.get()
       let stock = inventory.stock
@@ -392,14 +468,15 @@ export const Work = Game.System(
       let short = !fed
 
       if (open && staff.assigned > 0 && recipe.progress === 0 && room && fed) {
-        if (gatherer && !gather(gatherer.source, tile, gatherer.radius)) short = true
+        const deep = upgradeAt(kind, data.upgraded.value()?.level ?? 0)?.deep ?? false
+        if (gatherer && !gather(gatherer.source, tile, gatherer.radius, deep)) short = true
         else {
           if (recipe.input !== null) stock = { ...stock, [recipe.input]: stock[recipe.input] - recipe.inputs }
           recipe = { ...recipe, progress: 1 }
         }
       }
 
-      const pace = equipmentPace(kind, stock.tools, maybe(data.condition)?.value ?? Infinity, fishing, rules)
+      const pace = equipmentPace(kind, stock.tools, data.condition.value()?.value ?? Infinity, fishing, rules)
       const put = effort(staff, tick, rules)
       if (open && recipe.progress > 0 && put > 0 && paced(pace, tick)) {
         const progress = recipe.progress + put
@@ -452,16 +529,17 @@ export const Plant = Game.System(
       })
     },
     resources: { grid: Game.System.readResource(Grid), rng: Game.System.writeResource(Rng), time: Game.System.readResource(Time) },
-    services: { rules: Game.System.service(Rules) }
+    services: { rules: Game.System.service(Rules) },
+    commands: Game.System.commands(Game.System.spawns(Tree, Field), Game.System.relates(FieldOf))
   },
   ({ queries, resources, commands, services }) => {
     const rules = services.rules
     const { staffTicks: STAFF_TICKS } = rules
 
     const grid = resources.grid.get()
-    const random = Random.make(resources.rng.get())
+    const random = Random.draw(resources.rng)
     const sown = new Set<number>()
-    const tick = resources.time.get().tick
+    const tick = resources.time.get().step
     for (const { entity, data } of queries.planters.each()) {
       const tile = data.tile.get()
       const staff = data.staff.get()
@@ -476,7 +554,7 @@ export const Plant = Game.System(
       const grown = reach.filter((c) => useAt(grid, c.x, c.y) === planter.what).length
       const spots = reach.filter((c) => useAt(grid, c.x, c.y) === "empty" && !sown.has(key(c.x, c.y)))
       // A forester has no recipe of its own: its status is its planting.
-      if (!maybe(data.recipe)) {
+      if (!data.recipe.value()) {
         const status: StatusValue = data.paused.present ? "paused" : !open ? "unconnected" : staff.assigned === 0 ? "unstaffed" : grown < planter.max && spots.length > 0 ? "working" : "idle"
         if (data.status.get() !== status) data.status.set(status)
       }
@@ -491,7 +569,6 @@ export const Plant = Game.System(
       else commands.spawn(Game.Command.relate(fieldDraft(spot), FieldOf, entity.id))
       data.planter.set({ ...planter, cooldown: planter.interval })
     }
-    resources.rng.set(random.state)
   }
 )
 
@@ -506,15 +583,16 @@ export const Spread = Game.System(
   {
     queries: { trees: Game.Query({ selection: { tile: Game.Query.read(Tile), tree: Game.Query.read(Tree) } }) },
     resources: { grid: Game.System.readResource(Grid), rng: Game.System.writeResource(Rng), time: Game.System.readResource(Time) },
-    services: { rules: Game.System.service(Rules) }
+    services: { rules: Game.System.service(Rules) },
+    commands: Game.System.commands(Game.System.spawns(Tree))
   },
   ({ queries, resources, commands, services }) => {
     const rules = services.rules
     const { grown: GROWN, spreadTicks: SPREAD_TICKS } = rules
 
-    if (resources.time.get().tick % SPREAD_TICKS !== 0) return
+    if (!every(resources.time.get(), SPREAD_TICKS)) return
     const grid = resources.grid.get()
-    const random = Random.make(resources.rng.get())
+    const random = Random.draw(resources.rng)
     const grown = queries.trees.each().filter(({ data }) => data.tree.get().growth >= GROWN.tree)
     const parent = random.pick(grown)
     if (parent) {
@@ -522,7 +600,6 @@ export const Spread = Game.System(
       const spot = random.pick(wildTreeSpots(grid, t))
       if (spot && canSeedTree(grid, spot)) commands.spawn(treeDraft(spot, 0))
     }
-    resources.rng.set(random.state)
   }
 )
 
@@ -541,7 +618,7 @@ export const Grow = Game.System(
     const rules = services.rules
     const { grown: GROWN, growTicks: GROW_TICKS } = rules
 
-    if (resources.time.get().tick % GROW_TICKS !== 0) return
+    if (!every(resources.time.get(), GROW_TICKS)) return
     for (const { data } of queries.trees.each()) {
       const growth = data.tree.get().growth
       if (growth < GROWN.tree) data.tree.set({ growth: Math.min(GROWN.tree, growth + GROW_TICKS) })

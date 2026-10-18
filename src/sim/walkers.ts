@@ -11,10 +11,10 @@ import { appealAt } from "../appeal.ts"
  * planks and stone to mend — and walks home when its range is walked.
  */
 
-import { amounts, categoryColor, each, provisions, total, type Amounts } from "../content.ts"
+import { amounts, categoryColor, each, provisions, stepsOf, total, type Amounts } from "../content.ts"
 import { DIRS, doors, isRoad, key, nearest, ownerAt, pathTo, reach, useAt } from "../grid.ts"
 import { inside, type Point } from "../iso.ts"
-import { Building, Burning, Condition, Figure, Game, Rules, Grid, Appeal, Patrol, House, Inventory, Pantry, Paused, Recipe, Rescue, Rising, Risk, Roam, Route, Service, Sick, Site, Staff, Status, Tile, Time, WalkerOf, maybe, type Status as StatusValue } from "../schema.ts"
+import { Building, Burning, Condition, Figure, Game, Rules, Grid, Appeal, Handed, Patrol, House, Inventory, Pantry, Paused, Recipe, Rescue, Rising, Risk, Roam, Route, Service, Sick, Site, Staff, Status, Tile, Time, WalkerOf, type HandedValue, type Status as StatusValue } from "../schema.ts"
 import { CELL_STEPS } from "./shared.ts"
 import { paced } from "./work.ts"
 
@@ -37,11 +37,12 @@ export const Walk = Game.System(
   {
     queries: { walkers: Game.Query({ selection: { route: Game.Query.write(Route), rescue: Game.Query.optional(Rescue) } }) },
     resources: { grid: Game.System.readResource(Grid), time: Game.System.readResource(Time) },
-    services: { rules: Game.System.service(Rules) }
+    services: { rules: Game.System.service(Rules) },
+    commands: Game.System.commands(Game.System.despawns(Route))
   },
   ({ queries, resources, commands, services }) => {
     const grid = resources.grid.get()
-    const tick = resources.time.get().tick
+    const tick = resources.time.get().step
     const quicker = services.rules.pavedPace - 1
     for (const { entity, data } of queries.walkers.each()) {
       const route = data.route.get()
@@ -49,7 +50,7 @@ export const Walk = Game.System(
       if (route.index >= last) continue
       const next = route.cells[route.index + 1]!
       if (!isRoad(grid, next.x, next.y)) {
-        commands.despawn(entity.id)
+        commands.despawn(entity)
         continue
       }
       const running = data.rescue.present && !data.rescue.get().back
@@ -92,14 +93,15 @@ export const SendWalkers = Game.System(
       walkers: Game.Query({ selection: { roam: Game.Query.read(Roam), home: Game.Query.readRelation(WalkerOf) } })
     },
     resources: { grid: Game.System.readResource(Grid), time: Game.System.readResource(Time) },
-    services: { rules: Game.System.service(Rules) }
+    services: { rules: Game.System.service(Rules) },
+    commands: Game.System.commands(Game.System.spawns(Roam), Game.System.inserts(Patrol), Game.System.relates(WalkerOf))
   },
   ({ queries, resources, commands, services }) => {
     const rules = services.rules
     const { kinds, apprentice: APPRENTICE } = rules
 
     const grid = resources.grid.get()
-    const tick = resources.time.get().tick
+    const tick = resources.time.get().step
     const out = new Map<number, number>()
     for (const { data } of queries.walkers.each()) out.set(data.home.get(), (out.get(data.home.get()) ?? 0) + 1)
 
@@ -107,13 +109,13 @@ export const SendWalkers = Game.System(
       const service = data.service.get()
       const staff = data.staff.get()
       const starts = doors(grid, data.tile.get())
-      const stock = maybe(data.inventory)?.stock
+      const stock = data.inventory.value()?.stock
       const staffed = !data.paused.present && (staff.needed === 0 || staff.assigned > 0)
       const carries = (g: (typeof provisions)[number]) =>
         service.service === "goods" ? provisions.includes(g) : service.service === "repair" ? g === "planks" || g === "stone" : false
       const basket: Amounts = each((g) => (stock && carries(g) ? Math.min(BASKET, stock[g]) : 0))
       const goes = service.service === "goods" ? total(basket) > 0 : service.service === "repair" ? basket.planks > 0 : true
-      if (!maybe(data.recipe)) {
+      if (!data.recipe.value()) {
         const status: StatusValue = data.paused.present
           ? "paused"
           : starts.length === 0
@@ -140,7 +142,7 @@ export const SendWalkers = Game.System(
         const cursor = patrol.ok ? patrol.value.data.patrol.get().next : 0
         const tour = plan.tours[cursor % plan.tours.length]!
         if (patrol.ok) patrol.value.data.patrol.set({ next: (cursor + 1) % plan.tours.length })
-        else commands.insert(entity.id, Game.Command.entry(Patrol, { next: 1 % plan.tours.length }))
+        else commands.insert(entity, Game.Command.entry(Patrol, { next: 1 % plan.tours.length }))
         const color = categoryColor[kinds[data.building.get().kind].category]
         const draft = Game.Command.spawn(
           [Figure, { role: "walker", color }],
@@ -189,8 +191,9 @@ export const Wander = Game.System(
       buildings: Game.Query({ selection: { tile: Game.Query.read(Tile) }, with: [Service] }),
       inventories: Game.Query({ selection: { inventory: Game.Query.write(Inventory) }, with: [Service] })
     },
-    resources: { grid: Game.System.readResource(Grid), appeal: Game.System.readResource(Appeal), pantry: Game.System.writeResource(Pantry) },
-    services: { rules: Game.System.service(Rules) }
+    resources: { grid: Game.System.readResource(Grid), appeal: Game.System.readResource(Appeal), pantry: Game.System.writeResource(Pantry), handed: Game.System.writeResource(Handed), time: Game.System.readResource(Time) },
+    services: { rules: Game.System.service(Rules) },
+    commands: Game.System.commands(Game.System.despawns(Roam), Game.System.removes(Sick))
   },
   ({ queries, resources, commands, services }) => {
     const rules = services.rules
@@ -203,6 +206,9 @@ export const Wander = Game.System(
     const cared = new Map<number, ReturnType<typeof queries.cared.each>[number]>()
     for (const row of queries.cared.each()) cared.set(row.entity.id, row)
     let eaten = 0
+    // What each walker hands each home, for its building's last minute (see `Handed`).
+    const tick = resources.time.get().step
+    const handed: Array<HandedValue["log"][number]> = []
 
     for (const { entity, data } of walkers) {
       const route = data.route.get()
@@ -215,9 +221,11 @@ export const Wander = Game.System(
         const inv = queries.inventories.get(from)
         if (inv.ok && total(roam.basket) > 0) {
           const i = inv.value.data.inventory.get()
-          inv.value.data.inventory.set({ ...i, stock: each((g) => Math.min(i.cap, i.stock[g] + roam.basket[g])) })
+          // What it did not hand out goes back on the shelf, even past its room (the shelf filled again meanwhile):
+          // the building asks for no more until it is down again, and nothing is lost.
+          inv.value.data.inventory.set({ ...i, stock: each((g) => i.stock[g] + roam.basket[g]) })
         }
-        commands.despawn(entity.id)
+        commands.despawn(entity)
         continue
       }
 
@@ -241,6 +249,8 @@ export const Wander = Game.System(
           if (roam.service === "faith") h.faith = home.lasts.faith
           else if (roam.service === "goods") {
             const served = serveGoods(h, amounts(basket), rules, appealAt(resources.appeal.get().cells, x, y))
+            const given = Object.fromEntries(Object.entries(served.basket).filter(([g, n]) => (basket[g] ?? 0) > n).map(([g, n]) => [g, (basket[g] ?? 0) - n]))
+            if (Object.keys(given).length > 0) handed.push({ at: tick, from: data.home.get(), to: id, goods: given })
             Object.assign(h, served.house)
             Object.assign(basket, served.basket)
             eaten += served.eaten
@@ -252,7 +262,7 @@ export const Wander = Game.System(
         if (roam.service === "fire" && r.fire > 0) care.data.risk.set({ ...r, fire: 0 })
         if (row && roam.service === "health") {
           if (r.health > 0) care.data.risk.set({ ...r, health: 0 })
-          if (care.data.sick.present) commands.remove(care.entity.id, Sick)
+          if (care.data.sick.present) commands.remove(care.entity, Sick)
         }
         if (row && roam.service === "order" && (r.order > 0 || r.thefts > 0)) care.data.risk.set({ ...r, order: 0, thefts: 0 })
         if (roam.service === "repair") {
@@ -278,12 +288,15 @@ export const Wander = Game.System(
       const way = reach(grid, [cell])
       const door = building.ok ? nearest(way, doors(grid, building.value.data.tile.get())) : null
       if (!door) {
-        commands.despawn(entity.id)
+        commands.despawn(entity)
         continue
       }
       data.route.set({ cells: pathTo(way, door.cell), index: 0, step: 0 })
       data.roam.set({ ...roam, left: 0, basket: carrying, back: true })
     }
     if (eaten > 0) resources.pantry.update((p) => ({ ...p, eaten: p.eaten + eaten }))
+    // The last minute only; a log from another town (its clock behind this one's) is dropped.
+    const kept = resources.handed.get().log.filter((l) => l.at <= tick && tick - l.at < stepsOf(60))
+    if (handed.length > 0 || kept.length !== resources.handed.get().log.length) resources.handed.set({ log: [...kept, ...handed] })
   }
 )

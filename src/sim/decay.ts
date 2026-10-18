@@ -5,16 +5,17 @@ import { spoilExpectation } from "../rules/decay.ts"
  * shelf, slower in a granary. The pantry keeps count of what the town ate
  * and what rotted, a minute at a time.
  */
-import * as Random from "@typeonce/bevy-ts-math/Random"
+import * as Random from "@typeonce/ritmo-math/Random"
 
 import { ruinDraft } from "../archetypes.ts"
-import { foods, goodIds, ticks } from "../content.ts"
+import { foods, goodIds, stepsOf } from "../content.ts"
 import { placeName } from "../places.ts"
-import { Building, Burning, Charter, Chronicle, Condition, Game, Rules, House, Inventory, Pantry, Recipe, Rising, Rng, Site, Staff, Tile, Time, maybe } from "../schema.ts"
+import { Ruin } from "../schema.ts"
+import { Building, Burning, Charter, Chronicle, Condition, Game, Rules, House, Inventory, Pantry, Recipe, Rising, Rng, Site, Staff, Tile, Time } from "../schema.ts"
 import { elapsed, write } from "./shared.ts"
 
 /** The pantry warns of rotting food at most this often. */
-const ROT_WARNING = ticks(5 * 60)
+const ROT_WARNING = stepsOf(5 * 60)
 
 export const Decay = Game.System(
   "Town/Decay",
@@ -36,13 +37,14 @@ export const Decay = Game.System(
       pantry: Game.System.writeResource(Pantry),
       chronicle: Game.System.writeResource(Chronicle)
     },
-    services: { rules: Game.System.service(Rules) }
+    services: { rules: Game.System.service(Rules) },
+    commands: Game.System.commands(Game.System.spawns(Ruin), Game.System.despawns(Condition))
   },
   ({ queries, resources, commands, services }) => {
     const rules = services.rules
     const { kinds, condition: wear, spoils, spoilTicks: SPOIL_TICKS } = rules
 
-    const tick = resources.time.get().tick
+    const tick = resources.time.get().step
     const t = elapsed(resources.time.get(), resources.charter.get())
 
     // Wear: a point every `wear.every` steps; at nothing it falls down.
@@ -55,8 +57,8 @@ export const Decay = Game.System(
           continue
         }
         const tile = data.tile.get()
-        const b = maybe(data.building)
-        commands.despawn(entity.id)
+        const b = data.building.value()
+        commands.despawn(entity)
         commands.spawn(ruinDraft(tile, "collapsed"))
         write(
           resources.chronicle,
@@ -70,11 +72,11 @@ export const Decay = Game.System(
 
     // Spoiling: each shelf loses its share of what spoils, a granary's a fifth as much.
     if (tick % SPOIL_TICKS === 0) {
-      const random = Random.make(resources.rng.get())
+      const random = Random.draw(resources.rng)
       let rotted = 0
       for (const { data } of queries.shelves.each()) {
         const inv = data.inventory.get()
-        const keeps = kinds[maybe(data.building)?.kind ?? "townhall"].keeps ?? 1
+        const keeps = kinds[data.building.value()?.kind ?? "townhall"].keeps ?? 1
         let stock = inv.stock
         for (const g of goodIds) {
           const life = spoils[g]
@@ -87,7 +89,6 @@ export const Decay = Game.System(
         }
         if (stock !== inv.stock) data.inventory.set({ ...inv, stock })
       }
-      resources.rng.set(random.state)
       if (rotted > 0) resources.pantry.update((p) => ({ ...p, rotted: p.rotted + rotted }))
     }
 

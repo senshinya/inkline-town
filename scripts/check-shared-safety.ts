@@ -6,6 +6,8 @@ import { chromium } from "playwright"
 import { SAVE_FORMAT, SAVE_VERSION } from "../src/save.ts"
 import { headless } from "../src/sim/headless.ts"
 
+declare global { interface Window { __chronicleInjected?: number } }
+
 const base = process.env.GAME_BASE_URL ?? "http://127.0.0.1:5232"
 const town = headless({ size: "small", term: 45, land: "fair", seed: 7 })
 const world = town.snapshot()
@@ -30,7 +32,7 @@ try {
   await page.waitForFunction(() => document.body.classList.contains("visiting"), null, { timeout: 10000 })
   assert.deepEqual(errors, [], "Unknown tool markers must remain harmless text")
   await page.locator(".dialog .chronicle").waitFor({ state: "visible" })
-  assert.equal(await page.evaluate(() => (window as unknown as { __chronicleInjected?: number }).__chronicleInjected), undefined, "A shared chronicle must never execute markup")
+  assert.equal(await page.evaluate(() => window.__chronicleInjected), undefined, "A shared chronicle must never execute markup")
   assert.ok((await page.locator(".dialog .chronicle").textContent())?.includes(`0:00 ${payload}`))
   assert.equal(await page.locator(".dialog .chronicle img").count(), 0)
   await page.getByRole("button", { name: "查看城镇", exact: true }).click()
@@ -40,7 +42,7 @@ try {
   await recent.waitFor({ state: "visible" })
   assert.ok((await recent.textContent())?.includes(payload))
   assert.equal(await recent.locator("img").count(), 0)
-  assert.equal(await page.evaluate(() => (window as unknown as { __chronicleInjected?: number }).__chronicleInjected), undefined)
+  assert.equal(await page.evaluate(() => window.__chronicleInjected), undefined)
   console.log("Shared chronicle renders as text in both panels; no script executes and unknown tool markers are harmless")
 } finally {
   await browser.close()

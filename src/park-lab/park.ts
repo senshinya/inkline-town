@@ -15,7 +15,7 @@ export function builtPark(): InkAsset {
   const shift=([u,v,z]:Vertex):Vertex=>[u-30.5,v-30.5,z]
   return {
     id:"park-built",title:"逐格建造的公园",category:"land",footprint:7,
-    note:"二十五格草坪、花坛、碎石小径与石铺广场，配有两个街道入口、三盏路灯、一座喷泉和一尊石制半身像。",
+    note:"二十五格草坪、花坛、带边框的碎石步道与石板广场，设有两个临街入口、三盏路灯、座椅、分层喷泉和石雕半身像。",
     faces:[...park.faces,...roads.faces].map(f=>({...f,points:f.points.map(shift)})),
     strokes:[...park.strokes,...roads.strokes].map(s=>({...s,points:s.points.map(shift)})),
     fountains:(park.fountains??[]).map(f=>({...f,origin:shift(f.origin)}))

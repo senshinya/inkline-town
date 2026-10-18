@@ -330,7 +330,7 @@ export const guideSteps: ReadonlyArray<GuideStep> = [
     chapter: "Growing citizens",
     course: true,
     action: "选择[select]，再{轻点|点击}住宅，查看升级为市民住宅还缺少什么。",
-    why: "住宅获得面包、布料和信仰，且街区宜居度至少为 5 时，才能升级为市民住宅。详情面板会列出尚未满足的条件。",
+    why: "住宅获得面包、布料和信仰，街区宜居度达到 5，并支付金币、木板与石料后，即可升级。详情面板会列出尚未满足的条件。",
     goal: "首栋住宅入住市民",
     focus: "hall",
     when: () => true,
@@ -447,7 +447,7 @@ export const guideSteps: ReadonlyArray<GuideStep> = [
   {
     id: "markethall",
     chapter: "Keeping it standing",
-    action: "选中市场，在详情面板中将其升级为市场大厅。",
+    action: "{轻点|点击}上方带金色箭头的市场，在详情面板中开始升级市场大厅。",
     why: "部分住宅位于所有配送员的服务范围之外。市场大厅配送更频繁、范围更远，无需另建一座市场。",
     goal: "一座市场大厅建成",
     focus: { kind: "market" },
@@ -464,6 +464,18 @@ export const guideSteps: ReadonlyArray<GuideStep> = [
     focus: "poorStreet",
     when: (f) => f.poorStreet,
     done: (f) => f.finerHomes > 0
+  },
+  {
+    id: "carpenter",
+    chapter: "Growing citizens",
+    action: "建造木工坊，用木板制作家具。",
+    why: "富裕市民居住的市民宅邸需要家具：首次升级要消耗两件，此后还需市场定期配送，才能维持等级。市民宅邸容纳人数最多，税收也最高。",
+    goal: "一座木工坊建成",
+    asks: ["carpenter"],
+    focus: "hall",
+    when: (f) => f.citizens >= 60 && f.finerHomes >= 8,
+    done: (f) => has(f, "carpenter"),
+    waiting: rising("carpenter")
   },
   {
     id: "healer",

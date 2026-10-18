@@ -11,20 +11,18 @@
  * Saved components and resources are constructed with a validator, so the
  * whole world snapshots to plain data and loads back checked.
  */
-import { Decode, Descriptor, Schema } from "@typeonce/bevy-ts"
-import type { OptionalReadCell } from "@typeonce/bevy-ts/Query"
-import type { NodeRegistry } from "@typeonce/bevy-ts-render"
+import { Clock as SimulationClock, Decode, Descriptor, Schema } from "@typeonce/ritmo"
+import * as Random from "@typeonce/ritmo-math/Random"
+import type { NodeRegistry } from "@typeonce/ritmo-render"
+import { step } from "./content.ts"
 
 import type { BuildingView, FieldView, HouseView, RockView, RuinView, TreeView, WalkerView } from "./render3d/views.ts"
 import type { GameScene } from "./render3d/scene.ts"
-import { goodIds, groundIds, kindIds, landIds, propIds, serviceIds, sizeIds, type Amounts } from "./content.ts"
+import { goodIds, groundIds, kindIds, landIds, propIds, serviceIds, sizeIds, type Amounts, type GoodId } from "./content.ts"
 import type { Rules as RuleInputs } from "./rules/config.ts"
-import type { UiValue } from "./ui.ts"
+import type { Edit, UiValue } from "./ui.ts"
 
 export const Root = Schema.defineRoot("Town")
-
-/** An optional query slot's value, or `undefined` when the entity lacks it. */
-export const maybe = <T>(cell: OptionalReadCell<T>) => (cell.present ? cell.get() : undefined)
 
 const integer = Decode.integer
 const cell = Decode.struct({ x: integer, y: integer })
@@ -33,7 +31,7 @@ const service = Decode.literal(...serviceIds)
 /** A count of every good. */
 const amounts = Decode.struct({
   wood: integer, planks: integer, stone: integer, ore: integer, tools: integer, fish: integer, smoked: integer,
-  wheat: integer, flour: integer, bread: integer, wool: integer, cloth: integer
+  wheat: integer, flour: integer, bread: integer, wool: integer, cloth: integer, furniture: integer
 })
 
 export const statuses = ["building", "idle", "working", "starved", "blocked", "unstaffed", "unconnected", "paused"] as const
@@ -42,14 +40,14 @@ export type Status = (typeof statuses)[number]
 // ── On the grid ───────────────────────────────────────────────────────────
 
 /** A square of cells on the grid, by its top cell, `size` cells a side. */
-export const Tile = Descriptor.ConstructedComponent(Decode.struct({ x: integer, y: integer, size: integer }))("Town/Tile")
+export const Tile = Descriptor.ConstructedComponent(Decode.struct({ x: integer, y: integer, size: integer }))("Town/Tile", { immutable: true })
 export const Road = Descriptor.Tag("Town/Road")
 /** A road paved with stone: a little nicer to live on (see `appeal.ts`). */
 export const Paved = Descriptor.Tag("Town/Paved")
 /** A cell of park: its ground, and what stands on it (see `parks` in content). */
 export const Park = Descriptor.ConstructedComponent(Decode.struct({ ground: Decode.literal(...groundIds), prop: Decode.literal("none", ...propIds) }))("Town/Park")
 /** What is left of a home or building that burned, fell down, or was left derelict, until it is cleared. */
-export const Ruin = Descriptor.ConstructedComponent(Decode.struct({ cause: Decode.literal("burnt", "collapsed", "derelict") }))("Town/Ruin")
+export const Ruin = Descriptor.ConstructedComponent(Decode.struct({ cause: Decode.literal("burnt", "collapsed", "derelict") }))("Town/Ruin", { immutable: true })
 /** Materials still owed before it can go up, out of `total`. */
 export const Site = Descriptor.ConstructedComponent(Decode.struct({ owed: amounts, total: integer }))("Town/Site")
 /** Going up: steps since its materials were all in (see `BUILD_TICKS`). Removed once it stands. */
@@ -59,7 +57,8 @@ export const Rising = Descriptor.ConstructedComponent(Decode.struct({ ticks: int
 
 export const Tree = Descriptor.ConstructedComponent(Decode.struct({ growth: integer }))("Town/Tree")
 export const Rock = Descriptor.ConstructedComponent(Decode.struct({ ore: Decode.boolean, amount: integer }))("Town/Rock")
-export const Water = Descriptor.Tag("Town/Water")
+/** A cell of water: the step it was last fished (see `RESTOCK_TICKS`). */
+export const Water = Descriptor.ConstructedComponent(Decode.struct({ fished: integer }))("Town/Water")
 export const Field = Descriptor.ConstructedComponent(Decode.struct({ growth: integer }))("Town/Field")
 
 // ── Homes ─────────────────────────────────────────────────────────────────
@@ -72,8 +71,12 @@ export const House = Descriptor.ConstructedComponent(Decode.struct({
   bread: integer,
   cloth: integer,
   faith: integer,
+  furniture: integer,
   clock: integer
 }))("Town/House")
+
+/** The finest tier a home has been rebuilt for and paid (see `home.tiers`): rising to it again costs nothing. Absent: a cottage. */
+export const Rebuilt = Descriptor.ConstructedComponent(Decode.struct({ tier: Decode.literal(2, 3) }))("Town/Rebuilt", { immutable: true })
 
 // ── Risks and wear (homes and buildings) ──────────────────────────────────
 
@@ -92,13 +95,21 @@ export const Sick = Descriptor.ConstructedComponent(Decode.struct({ left: intege
 
 // ── Buildings and their roles ─────────────────────────────────────────────
 
-export const Building = Descriptor.ConstructedComponent(Decode.struct({ kind: Decode.literal(...kindIds) }))("Town/Building")
+export const Building = Descriptor.ConstructedComponent(Decode.struct({ kind: Decode.literal(...kindIds) }))("Town/Building", { immutable: true })
 export const TownHall = Descriptor.Tag("Town/TownHall")
 export const Status = Descriptor.ConstructedComponent(Decode.literal(...statuses))("Town/Status")
 /** Stopped by the town: no workers, a quarter of its upkeep. */
 export const Paused = Descriptor.Tag("Town/Paused")
-/** Upgraded where it stands (see `Kind.upgrade`): its walker, desirability, and upkeep are the upgrade's. */
-export const Upgraded = Descriptor.Tag("Town/Upgraded")
+/** Upgraded where it stands, `level` times (see `Kind.upgrade`): it works as `asUpgraded` says. */
+export const Upgraded = Descriptor.ConstructedComponent(Decode.struct({ level: Decode.literal(1, 2) }))("Town/Upgraded", { immutable: true })
+/**
+ * Being upgraded to `level` where it stands: its coins are paid, and these
+ * materials are still owed, out of `total`; carriers bring them while it
+ * goes on working, and builders put in `done` steps of work as they come,
+ * never ahead of what is in (see `WORKS_TICKS`). Once everything is in and
+ * worked, it stands upgraded.
+ */
+export const Works = Descriptor.ConstructedComponent(Decode.struct({ owed: amounts, total: integer, done: integer, level: Decode.literal(1, 2) }))("Town/Works")
 
 /**
  * Workers it needs, how many came (`apprentices` of them settlers standing
@@ -127,7 +138,7 @@ export const Recipe = Descriptor.ConstructedComponent(Decode.struct({
 export const Gatherer = Descriptor.ConstructedComponent(Decode.struct({
   source: Decode.literal("tree", "stone", "ore", "field", "water"),
   radius: integer
-}))("Town/Gatherer")
+}))("Town/Gatherer", { immutable: true })
 
 /** Plants trees or fields within `radius`, one every `interval` steps, up to `max`. */
 export const Planter = Descriptor.ConstructedComponent(Decode.struct({
@@ -139,7 +150,7 @@ export const Planter = Descriptor.ConstructedComponent(Decode.struct({
 }))("Town/Planter")
 
 /** Carriers it may have out at once. */
-export const Carriers = Descriptor.ConstructedComponent(Decode.struct({ count: integer }))("Town/Carriers")
+export const Carriers = Descriptor.ConstructedComponent(Decode.struct({ count: integer }))("Town/Carriers", { immutable: true })
 
 /** Sends a walker out every `interval` steps. */
 export const Service = Descriptor.ConstructedComponent(Decode.struct({ service, interval: integer, cooldown: integer, range: integer }))("Town/Service")
@@ -149,7 +160,7 @@ export const Patrol = Descriptor.ConstructedComponent(Decode.struct({ next: inte
 // ── Walkers ───────────────────────────────────────────────────────────────
 
 /** How a walker looks: a carrier, or a walker in its building's colour. */
-export const Figure = Descriptor.ConstructedComponent(Decode.struct({ role: Decode.literal("carrier", "walker"), color: integer }))("Town/Figure")
+export const Figure = Descriptor.ConstructedComponent(Decode.struct({ role: Decode.literal("carrier", "walker"), color: integer }))("Town/Figure", { immutable: true })
 
 /**
  * Where a walker is going: road cells in order, the one it last reached, and
@@ -179,9 +190,9 @@ export const { relation: FieldOf } = Descriptor.Hierarchy("Town/FieldOf", "Town/
 
 // ── Resources ─────────────────────────────────────────────────────────────
 
-export const Time = Descriptor.ConstructedResource(Decode.struct({ tick: integer }))("Town/Time")
-/** The deterministic random state (see `@typeonce/bevy-ts-math/Random`). */
-export const Rng = Descriptor.ConstructedResource(integer)("Town/Rng")
+export const Time = SimulationClock.resource("Town/Time", step)
+/** The world's seeded random state: systems draw with `Random.draw(resources.rng)` (see `@typeonce/ritmo-math/Random`). */
+export const Rng = Descriptor.ConstructedResource(Random)("Town/Rng")
 export const Treasury = Descriptor.ConstructedResource(Decode.struct({ coins: integer }))("Town/Treasury")
 /** The last collection's taxes, trade (sold less bought), upkeep, and administration, per minute. */
 export const Ledger = Descriptor.ConstructedResource(Decode.struct({ taxes: integer, trade: integer, upkeep: integer, admin: integer }))("Town/Ledger")
@@ -199,6 +210,7 @@ export const Census = Descriptor.ConstructedResource(Decode.struct({
   bread: integer,
   cloth: integer,
   faith: integer,
+  furniture: integer,
   /** Homes sick, and homes and buildings on fire, right now. */
   sick: integer,
   burning: integer
@@ -393,11 +405,33 @@ export interface FlowValue {
   } | null
 }
 export const Flow = Descriptor.TransientResource<FlowValue>()("Town/Flow")
+/**
+ * What provisions walkers handed to homes over the last minute (not saved: it starts over on a load): a line for
+ * each home a walker gave something, from which building, and what. A market's panel reads it, as its shelf alone
+ * says little: food leaves in the walker's basket as soon as it comes, and furniture mostly comes back.
+ */
+export interface HandedValue {
+  readonly log: ReadonlyArray<{ readonly at: number; readonly from: number; readonly to: number; readonly goods: Partial<Record<GoodId, number>> }>
+}
+export const Handed = Descriptor.TransientResource<HandedValue>()("Town/Handed")
 
 // ── Host services ─────────────────────────────────────────────────────────
 
 export const Rules = Descriptor.Service<RuleInputs>()("Town/Rules")
+/**
+ * The page's input to the simulation: each step takes the edits queued since
+ * the last one (plain data, so a replay can record and play it back).
+ */
+export const Edits = Descriptor.Service<{ readonly snapshot: () => ReadonlyArray<Edit> }>()("Town/Edits")
+/** The page itself, for the views only: the simulation never reads it (it talks to the page through `Toast` and `Selection`). */
 export const Ui = Descriptor.Service<UiValue>()("Town/Ui")
+
+// ── What the simulation tells the page ────────────────────────────────────
+
+/** A message for the player (an edit refused: "No room there"). */
+export const Toast = Descriptor.Event<string>()("Town/Toast")
+/** The panel's selection, changed by an edit: open a new building, or let go of one that is gone. */
+export const Selection = Descriptor.Event<{ readonly select: number } | { readonly clear: true } | { readonly clearIf: number }>()("Town/Selection")
 /** The frame's length, for animation only: the simulation runs on `Time`. */
 export const Clock = Descriptor.Service<{ deltaSeconds: number; elapsed: number }>()("Town/Clock")
 export const StageService = Descriptor.Service<GameScene>()("Town/Stage")
@@ -412,14 +446,31 @@ export const RuinNodes = Descriptor.Service<NodeRegistry.NodeRegistry<RuinView>>
 export const Game = Schema.bind(
   Schema.fragment({
     components: {
-      Tile, Road, Paved, Park, Ruin, Site, Rising, Tree, Rock, Water, Field, House, Risk, Condition, Burning, Sick, Building, TownHall, Status,
-      Paused, Upgraded, Staff, Inventory, Storage, Recipe, Gatherer, Planter, Carriers, Service, Patrol, Figure, Route, Errand, Rescue, Roam
+      Tile, Road, Paved, Park, Ruin, Site, Rising, Tree, Rock, Water, Field, House, Rebuilt, Risk, Condition, Burning, Sick, Building, TownHall, Status,
+      Paused, Upgraded, Works, Staff, Inventory, Storage, Recipe, Gatherer, Planter, Carriers, Service, Patrol, Figure, Route, Errand, Rescue, Roam
     },
     resources: {
       Time, Rng, Treasury, Ledger, Census, Policy, Charter, Land, Market, Mood, Crown, Fate, History, Chronicle, Guide, Appeal, Pantry, Fires,
-      Grid, Stock, Flow
+      Grid, Stock, Flow, Handed
     },
-    relations: { WalkerOf, FieldOf }
+    events: { Toast, Selection },
+    relations: { WalkerOf, FieldOf },
+    // What always comes together: a draft or insert missing one of these does not compile.
+    requires: [
+      Schema.requires(Building, Tile, Status, Staff),
+      Schema.requires(House, Tile),
+      Schema.requires(Ruin, Tile),
+      Schema.requires(Park, Tile),
+      Schema.requires(Road, Tile),
+      Schema.requires(Tree, Tile),
+      Schema.requires(Rock, Tile),
+      Schema.requires(Water, Tile),
+      Schema.requires(Field, Tile),
+      Schema.requires(Figure, Route),
+      Schema.requires(Errand, Figure),
+      Schema.requires(Roam, Figure),
+      Schema.requires(Rescue, Figure)
+    ]
   }),
   Root
 )

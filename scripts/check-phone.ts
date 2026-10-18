@@ -17,6 +17,14 @@ try {
   for (const [name,width,height] of [["portrait",390,720],["narrow",360,640],["landscape",762,330]] as const) {
     const page=await browser.newPage({viewport:{width,height},deviceScaleFactor:2,isMobile:true,hasTouch:true})
     page.on("pageerror",e=>errors.push(`${name}: ${e.message}`))
+    await page.addInitScript(() => {
+  // The development monitor overlays the game; exercise the production UI.
+  document.addEventListener("DOMContentLoaded", () => {
+    const style = document.createElement("style")
+    style.textContent = ".btm { display: none !important }"
+    document.head.append(style)
+  }, { once: true })
+})
     await page.goto(process.env.GAME_BASE_URL??"http://127.0.0.1:5232")
     await page.waitForFunction(()=>"town" in window)
     // The found button sits inside the screen without scrolling: it is pinned to the bottom.

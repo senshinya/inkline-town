@@ -4,6 +4,7 @@ import assert from "node:assert/strict"
 import { existsSync } from "node:fs"
 import { mkdir, writeFile } from "node:fs/promises"
 import { chromium } from "playwright"
+import { kindIds } from "../src/content.ts"
 
 const executablePath = process.env.BROWSER_EXECUTABLE_PATH ?? ["/Applications/Brave Browser.app/Contents/MacOS/Brave Browser", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"].find(existsSync)
 const browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) })
@@ -14,7 +15,7 @@ page.on("console", e => { if (e.type() === "error") errors.push(e.text()) })
 page.on("response", r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`) })
 const output = "output/inkline-3d/town-review"
 await mkdir(output, { recursive: true })
-const groups = ["全部建筑", "细节修订", "贸易与生产建筑", "工坊组", "修订模型", "建筑", "公园", "住宅与街区", "冬季", "废墟", "人物与货物", "建筑状况", "建筑升级与采空矿面"]
+const groups = ["市政建筑阶段", "共用施工模型", "PR #20 · 新模型", "全部建筑", "细节修订", "贸易与生产建筑", "工坊组", "修订模型", "建筑", "公园", "住宅与街区", "冬季", "废墟", "人物与货物", "建筑状况", "建筑升级与采空矿面"]
 const captureSheet = async () => {
   const previous = await page.locator("#sheet-link").getAttribute("href")
   await page.getByRole("button", { name: "保存模型总览图", exact: true }).click()
@@ -42,7 +43,7 @@ try {
     await page.screenshot({ path: `${output}/${collection}-page.png` })
     await page.getByRole("button", { name: "查看背面", exact: true }).click()
     assert.equal(await page.locator("output").textContent(), "180°")
-    if (["town", "rural", "workshops", "trades"].includes(collection)) {
+    if (["milestones", "works", "handoff", "town", "rural", "workshops", "trades"].includes(collection)) {
       const rear = await captureSheet()
       await writeFile(`${output}/${collection}-rear.png`, Buffer.from(rear.split(",")[1]!, "base64"))
     }
@@ -54,7 +55,7 @@ try {
     console.log(`ok ${collection}: ${await page.locator(".model-view").count()} models, rotation, elevation, PNG export`)
   }
   await page.setViewportSize({ width: 390, height: 844 })
-  for (const [group, count, name] of [["全部建筑", 25, "town"], ["细节修订", 9, "rural"]] as const) {
+  for (const [group, count, name] of [["市政建筑阶段", 3, "milestones"], ["共用施工模型", 9, "works"], ["PR #20 · 新模型", 14, "handoff"], ["全部建筑", kindIds.length + 2, "town"], ["细节修订", 9, "rural"]] as const) {
     await page.getByRole("button", { name: group, exact: true }).click()
     assert.equal(await page.locator(".model-view").count(), count)
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${group}: phone preview must fit`)
